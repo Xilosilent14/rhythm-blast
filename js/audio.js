@@ -141,19 +141,6 @@ const Audio = (() => {
     let beatCallback = null;
 
     function startSong(song, onBeat) {
-        if (!settings.music) {
-            // Still fire beat callbacks for note timing even without music
-            beatCallback = onBeat;
-            currentBPM = song.bpm;
-            beatIndex = 0;
-            const interval = 60000 / song.bpm;
-            beatInterval = setInterval(() => {
-                if (beatCallback) beatCallback(beatIndex);
-                beatIndex++;
-            }, interval);
-            return;
-        }
-
         const c = _getCtx();
         currentSongMelody = song.melody || [];
         currentSongBass = song.bass || [];
@@ -161,50 +148,76 @@ const Audio = (() => {
         beatIndex = 0;
         beatCallback = onBeat;
 
-        const interval = 60000 / song.bpm;
+        const beatDuration = 60 / song.bpm; // seconds per beat
+        const songStartTime = c.currentTime;
+        let lastScheduledBeat = -1;
 
+        // Lookahead scheduler: checks every 25ms, schedules 100ms ahead
+        // This prevents timing drift that setInterval causes
         beatInterval = setInterval(() => {
-            // Play melody note
-            if (currentSongMelody.length > 0) {
-                const freq = currentSongMelody[beatIndex % currentSongMelody.length];
-                if (freq > 0) {
-                    _makeNote(freq, interval / 1200, 'square', musicGain, 0.15);
+            const now = c.currentTime;
+            const currentBeat = Math.floor((now - songStartTime) / beatDuration);
+
+            // Schedule any beats that need to fire
+            while (lastScheduledBeat < currentBeat) {
+                lastScheduledBeat++;
+                const bi = lastScheduledBeat;
+                const beatTime = songStartTime + bi * beatDuration;
+
+                if (settings.music) {
+                    // Melody note
+                    if (currentSongMelody.length > 0) {
+                        const freq = currentSongMelody[bi % currentSongMelody.length];
+                        if (freq > 0) {
+                            _scheduleNote(freq, beatTime, beatDuration * 0.8, 'square', musicGain, 0.15);
+                        }
+                    }
+
+                    // Bass (every other beat)
+                    if (bi % 2 === 0 && currentSongBass.length > 0) {
+                        const bf = currentSongBass[Math.floor(bi / 2) % currentSongBass.length];
+                        if (bf > 0) {
+                            _scheduleNote(bf, beatTime, beatDuration * 0.6, 'triangle', musicGain, 0.2);
+                        }
+                    }
+
+                    // Drums
+                    const bib = bi % 4;
+                    if (bib === 0 || bib === 2) {
+                        _scheduleNote(80, beatTime, 0.12, 'sine', musicGain, 0.3);
+                        _scheduleNote(40, beatTime + 0.01, 0.06, 'sine', musicGain, 0.2);
+                    }
+                    if (bib === 1 || bib === 3) {
+                        _scheduleNote(200, beatTime, 0.06, 'square', musicGain, 0.12);
+                    }
+                    // Hi-hat every beat
+                    _scheduleNote(6000 + (bi * 137 % 3000), beatTime, 0.02, 'square', musicGain, 0.04);
                 }
+
+                // Fire visual beat callback
+                if (beatCallback) beatCallback(bi);
             }
 
-            // Play bass note (every other beat)
-            if (beatIndex % 2 === 0 && currentSongBass.length > 0) {
-                const bassFreq = currentSongBass[Math.floor(beatIndex / 2) % currentSongBass.length];
-                if (bassFreq > 0) {
-                    _makeNote(bassFreq, interval / 800, 'triangle', musicGain, 0.2);
-                }
-            }
+            beatIndex = currentBeat;
+        }, 25); // 25ms lookahead interval (tight, drift-free)
+    }
 
-            // Drum pattern: kick on 1 and 3, snare on 2 and 4, hi-hat on every beat
-            const beatInBar = beatIndex % 4;
-            if (beatInBar === 0 || beatInBar === 2) {
-                // Kick drum: low sine with fast pitch drop
-                _makeNote(80, 0.12, 'sine', musicGain, 0.3);
-                setTimeout(() => _makeNote(40, 0.06, 'sine', musicGain, 0.2), 10);
-            }
-            if (beatInBar === 1 || beatInBar === 3) {
-                // Snare: noise-like burst (high freq short square)
-                _makeNote(200, 0.06, 'square', musicGain, 0.12);
-                _makeNote(400 + Math.random() * 200, 0.04, 'sawtooth', musicGain, 0.08);
-            }
-            // Hi-hat: high frequency click on every beat
-            _makeNote(6000 + Math.random() * 3000, 0.02, 'square', musicGain, 0.04);
-            // Open hi-hat on the "and" (between beats)
-            if (beatInBar === 1) {
-                setTimeout(() => {
-                    _makeNote(8000, 0.05, 'square', musicGain, 0.03);
-                }, 60000 / currentBPM / 2);
-            }
-
-            // Fire beat callback for note spawning
-            if (beatCallback) beatCallback(beatIndex);
-            beatIndex++;
-        }, interval);
+    // Schedule a note at a precise audio time (drift-free)
+    function _scheduleNote(freq, time, duration, waveform, gainNode, vol) {
+        const c = _getCtx();
+        if (time < c.currentTime) return; // Skip if in the past
+        try {
+            const osc = c.createOscillator();
+            const env = c.createGain();
+            osc.type = waveform;
+            osc.frequency.setValueAtTime(freq, time);
+            env.gain.setValueAtTime(vol, time);
+            env.gain.exponentialRampToValueAtTime(0.001, time + duration);
+            osc.connect(env);
+            env.connect(gainNode);
+            osc.start(time);
+            osc.stop(time + duration + 0.01);
+        } catch (e) { /* ignore scheduling errors */ }
     }
 
     function stopSong() {
