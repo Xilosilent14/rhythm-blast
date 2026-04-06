@@ -5,6 +5,60 @@
 const Main = (() => {
     let currentScreen = null;
     let currentSongId = null;
+    let titleAnimId = null;
+
+    // Title screen background animation
+    function _startTitleAnim() {
+        const canvas = document.getElementById('title-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.parentElement.offsetWidth || 1024;
+        canvas.height = canvas.parentElement.offsetHeight || 600;
+        const W = canvas.width, H = canvas.height;
+        const particles = [];
+        const colors = ['#22d3ee', '#a855f7', '#ec4899', '#facc15', '#4ade80'];
+
+        function animate() {
+            ctx.clearRect(0, 0, W, H);
+            // Spawn new particles
+            if (particles.length < 40 && Math.random() < 0.15) {
+                particles.push({
+                    x: Math.random() * W,
+                    y: -20,
+                    vy: 0.5 + Math.random() * 1.5,
+                    size: 3 + Math.random() * 6,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    alpha: 0.3 + Math.random() * 0.4,
+                    shape: Math.random() < 0.5 ? 'circle' : 'note'
+                });
+            }
+            // Update and draw
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.y += p.vy;
+                p.alpha -= 0.002;
+                if (p.y > H || p.alpha <= 0) { particles.splice(i, 1); continue; }
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                if (p.shape === 'circle') {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    // Music note shape
+                    ctx.font = `${p.size * 3}px serif`;
+                    ctx.fillText('\u266A', p.x, p.y);
+                }
+            }
+            ctx.globalAlpha = 1;
+            titleAnimId = requestAnimationFrame(animate);
+        }
+        animate();
+    }
+
+    function _stopTitleAnim() {
+        if (titleAnimId) { cancelAnimationFrame(titleAnimId); titleAnimId = null; }
+    }
 
     function init() {
         // Apply saved settings
@@ -97,7 +151,8 @@ const Main = (() => {
 
         // Screen-specific setup
         if (name === 'songs') _buildSongGrid();
-        if (name === 'title') _updatePlayerInfo();
+        if (name === 'title') { _updatePlayerInfo(); _startTitleAnim(); }
+        else { _stopTitleAnim(); }
     }
 
     function _updatePlayerInfo() {
