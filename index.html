@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Rhythm Blast — OTB Games</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="css/shared/design-system.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splash" class="otb-splash">
+        <div class="otb-splash-badge">OTB Games</div>
+        <div class="splash-icon">🎵</div>
+        <div class="otb-splash-title" style="text-shadow: 0 0 20px rgba(168,85,247,0.5);">RHYTHM BLAST</div>
+        <div class="otb-splash-subtitle">Loading beats...</div>
+        <div class="otb-splash-loader">
+            <div class="otb-splash-loader-fill"></div>
+        </div>
+    </div>
+
+    <!-- Title Screen -->
+    <div id="screen-title" class="screen">
+        <div class="title-bg">
+            <div class="otb-badge" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:5;">OTB Games</div>
+            <canvas id="title-canvas" width="1024" height="600"></canvas>
+            <div class="title-overlay">
+                <h1 class="game-title">RHYTHM<br><span class="title-accent">BLAST</span></h1>
+                <div class="title-buttons">
+                    <button class="otb-btn otb-btn-primary otb-btn-large" id="btn-play">🎵 Play</button>
+                    <div class="title-row">
+                        <button class="otb-btn otb-btn-secondary" id="btn-settings">Settings</button>
+                        <button class="otb-btn otb-btn-secondary" id="btn-parent">Parents</button>
+                    </div>
+                    <a id="hub-link" href="#" class="otb-btn otb-btn-small" style="opacity:0.5;text-decoration:none;">🎮 Hub</a>
+                </div>
+                <div class="player-info">
+                    <span class="player-name" id="player-name"></span>
+                    <span class="player-level" id="player-level"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Song Select Screen -->
+    <div id="screen-songs" class="screen">
+        <div class="screen-header">
+            <button class="otb-btn otb-btn-small btn-back" id="btn-songs-back">Back</button>
+            <h2>Choose a Song</h2>
+        </div>
+        <div class="songs-content">
+            <div class="songs-grid" id="songs-grid"></div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="screen-game" class="screen">
+        <canvas id="game-canvas"></canvas>
+        <div class="game-hud">
+            <div class="hud-left">
+                <span class="hud-score" id="hud-score">0</span>
+                <span class="hud-combo" id="hud-combo"></span>
+            </div>
+            <div class="hud-center">
+                <span class="hud-song-name" id="hud-song-name"></span>
+            </div>
+            <div class="hud-right">
+                <button class="otb-btn otb-btn-small hud-pause" id="btn-pause">⏸</button>
+            </div>
+        </div>
+        <!-- Hit feedback overlay -->
+        <div class="hit-feedback" id="hit-feedback"></div>
+        <!-- Countdown overlay -->
+        <div class="countdown-overlay" id="countdown" style="display:none;">
+            <span class="countdown-num" id="countdown-num">3</span>
+        </div>
+    </div>
+
+    <!-- Pause Overlay -->
+    <div id="pause-overlay" class="overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="pause-panel otb-panel-solid">
+            <h2 class="otb-heading-gold">Paused</h2>
+            <button class="otb-btn otb-btn-primary" id="btn-resume">Resume</button>
+            <button class="otb-btn otb-btn-secondary" id="btn-quit">Quit Song</button>
+        </div>
+    </div>
+
+    <!-- Results Screen -->
+    <div id="screen-results" class="screen">
+        <div class="results-content">
+            <h2 class="otb-heading-gold results-title" id="results-title">Song Complete!</h2>
+            <div class="otb-stars" id="results-stars"></div>
+            <div class="results-grade" id="results-grade"></div>
+            <div class="results-stats otb-panel" id="results-stats"></div>
+            <div class="results-xp" id="results-xp"></div>
+            <div class="results-buttons">
+                <button class="otb-btn otb-btn-primary" id="btn-replay">Replay</button>
+                <button class="otb-btn otb-btn-secondary" id="btn-songs-menu">Songs</button>
+                <button class="otb-btn otb-btn-small" id="btn-results-home">Home</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="screen-settings" class="screen">
+        <div class="screen-header">
+            <button class="otb-btn otb-btn-small btn-back" id="btn-settings-back">Back</button>
+            <h2>Settings</h2>
+        </div>
+        <div class="settings-content">
+            <div class="otb-settings-group">
+                <div class="otb-settings-item on" id="setting-sfx" data-setting="sfx">
+                    <div class="otb-settings-item-info">
+                        <span class="otb-settings-icon">🔊</span>
+                        <div>
+                            <div class="otb-settings-label">Sound Effects</div>
+                            <div class="otb-settings-desc">Hit sounds and feedback</div>
+                        </div>
+                    </div>
+                    <div class="otb-toggle-track on"><div class="otb-toggle-thumb"></div></div>
+                </div>
+                <div class="otb-settings-item on" id="setting-music" data-setting="music">
+                    <div class="otb-settings-item-info">
+                        <span class="otb-settings-icon">🎵</span>
+                        <div>
+                            <div class="otb-settings-label">Background Music</div>
+                            <div class="otb-settings-desc">Song backing tracks</div>
+                        </div>
+                    </div>
+                    <div class="otb-toggle-track on"><div class="otb-toggle-thumb"></div></div>
+                </div>
+                <div class="otb-settings-item on" id="setting-voice" data-setting="voice">
+                    <div class="otb-settings-item-info">
+                        <span class="otb-settings-icon">🗣️</span>
+                        <div>
+                            <div class="otb-settings-label">Voice (Read Aloud)</div>
+                            <div class="otb-settings-desc">Words spoken for reading notes</div>
+                        </div>
+                    </div>
+                    <div class="otb-toggle-track on"><div class="otb-toggle-thumb"></div></div>
+                </div>
+            </div>
+            <div class="otb-about">
+                <div class="otb-about-text">Part of the OTB Games family</div>
+                <div class="otb-about-version">Rhythm Blast v1.0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Parent Dashboard -->
+    <div id="screen-parent" class="screen">
+        <div class="screen-header">
+            <button class="otb-btn otb-btn-small btn-back" id="btn-parent-back">Back</button>
+            <h2>Parent Dashboard</h2>
+        </div>
+        <div class="parent-content">
+            <div class="otb-parent-lock" id="parent-lock">
+                <div class="otb-parent-lock-text">Solve to unlock:</div>
+                <div class="otb-parent-lock-math" id="parent-math"></div>
+                <input type="number" class="otb-parent-lock-input" id="parent-answer" inputmode="numeric">
+                <button class="otb-btn otb-btn-primary otb-btn-small" id="btn-parent-unlock">Unlock</button>
+            </div>
+            <div class="parent-dashboard" id="parent-dashboard" style="display:none;">
+                <div class="otb-dashboard-section">
+                    <h3>Session Summary</h3>
+                    <div id="parent-stats"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/math-data.js"></script>
+    <script src="js/reading-data.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/song-data.js"></script>
+    <script src="js/note-generator.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/progress.js"></script>
+    <script src="js/otb-config.js"></script>
+    <script src="js/ecosystem.js"></script>
+    <script src="js/main.js"></script>
+    <script>
+        if(typeof OTBConfig!=='undefined'){const h=document.getElementById('hub-link');if(h)h.href=OTBConfig.getHubUrl();}
+    </script>
+</body>
+</html>
