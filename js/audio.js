@@ -243,14 +243,23 @@ const Audio = (() => {
             const u = new SpeechSynthesisUtterance(text);
             u.rate = 0.85;
             u.pitch = 1.1;
-            u.onend = () => {
+            const _restoreMusic = () => {
                 if (musicGain) {
                     musicGain.gain.linearRampToValueAtTime(MUSIC_VOL, _getCtx().currentTime + 0.3);
                 }
             };
+            u.onend = _restoreMusic;
+            u.onerror = _restoreMusic;
+            // Fallback: restore music after 5s even if TTS hangs
+            setTimeout(_restoreMusic, 5000);
             speechSynthesis.cancel();
             speechSynthesis.speak(u);
-        } catch (e) { /* ignore TTS failures */ }
+        } catch (e) {
+            // Restore music if TTS fails
+            if (musicGain) {
+                musicGain.gain.linearRampToValueAtTime(MUSIC_VOL, _getCtx().currentTime + 0.3);
+            }
+        }
     }
 
     function setSettings(s) { Object.assign(settings, s); }

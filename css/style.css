@@ -289,9 +289,9 @@ html, body {
     color: var(--otb-text-muted);
 }
 .hud-pause {
-    min-width: 48px;
-    min-height: 48px;
-    font-size: 1.2rem;
+    min-width: 72px;
+    min-height: 72px;
+    font-size: 1.4rem;
     background: rgba(0,0,0,0.4);
     border: 2px solid var(--otb-border);
     border-radius: 50%;

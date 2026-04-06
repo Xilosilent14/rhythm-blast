@@ -253,7 +253,8 @@ const Game = (() => {
         // Check if song is done
         if (noteQueue.length > 0) {
             const allSpawned = noteQueue.every(n => n.spawned);
-            const lastNoteBeat = Math.max(...noteQueue.filter(n => !n._tts).map(n => n.hitBeat));
+            const nonTtsNotes = noteQueue.filter(n => !n._tts);
+            const lastNoteBeat = nonTtsNotes.length > 0 ? Math.max(...nonTtsNotes.map(n => n.hitBeat)) : 0;
             const songDone = allSpawned && activeNotes.length === 0 && beatsElapsed > lastNoteBeat + 5;
             if (songDone) {
                 _endSong();
@@ -442,7 +443,8 @@ const Game = (() => {
         activeNotes.forEach(n => {
             if (n.hit || n.missed || n.lane !== tappedLane || n._tts) return;
             if (n.type === 'sequence-lead') {
-                // Auto-pass lead notes when tapped
+                // Auto-pass lead notes when tapped (guard against double-hit)
+                if (n.hit) return;
                 const dist = Math.abs(n.y - hitZoneY);
                 if (dist < OK_WINDOW / (1000 / 60) * noteSpeed + 40) {
                     n.hit = true;

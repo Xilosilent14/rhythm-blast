@@ -227,7 +227,11 @@ const Main = (() => {
         });
     }
 
+    let _countdownInterval = null;
     function _doCountdown(callback) {
+        // Clear any existing countdown (prevents stacking)
+        if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
+
         const overlay = document.getElementById('countdown');
         const numEl = document.getElementById('countdown-num');
         overlay.style.display = 'flex';
@@ -236,7 +240,7 @@ const Main = (() => {
         numEl.textContent = count;
         Audio.countdown();
 
-        const interval = setInterval(() => {
+        _countdownInterval = setInterval(() => {
             count--;
             if (count > 0) {
                 numEl.textContent = count;
@@ -251,7 +255,8 @@ const Main = (() => {
                 void numEl.offsetWidth;
                 numEl.style.animation = 'count-pulse 0.5s ease-out';
                 Audio.countdownGo();
-                clearInterval(interval);
+                clearInterval(_countdownInterval);
+                _countdownInterval = null;
                 setTimeout(() => {
                     overlay.style.display = 'none';
                     numEl.style.color = '';
