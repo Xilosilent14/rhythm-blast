@@ -53,6 +53,16 @@ const Game = (() => {
     let hitFeedbackTimer = 0;
     let bgHue = 240; // slowly shifting background
 
+    // Lane flash (per-lane activation glow on hit)
+    let laneFlash = [0, 0, 0];
+
+    // Miss splash effects
+    let missEffects = [];
+
+    // Combo meter animation
+    let comboMeterValue = 0; // smoothly animates toward target
+    let comboMeterBreaking = 0; // shrink animation on combo break
+
     // Beat pulse
     let beatPulse = 0;
 
@@ -107,6 +117,10 @@ const Game = (() => {
         noteResults = [];
         activeNotes = [];
         particles = [];
+        missEffects = [];
+        laneFlash = [0, 0, 0];
+        comboMeterValue = 0;
+        comboMeterBreaking = 0;
         screenShake = 0;
         beatPulse = 0;
         beatsElapsed = 0;
@@ -219,8 +233,12 @@ const Game = (() => {
                 if (n.type === 'sequence-lead') return; // lead notes auto-pass
                 if (n.type === 'sequence-answer' && !n.isCorrect) return; // wrong answer in sequence, don't count
                 misses++;
-                if (combo > 0) Audio.comboBreak();
+                if (combo > 0) {
+                    Audio.comboBreak();
+                    comboMeterBreaking = 1.0;
+                }
                 combo = 0;
+                _spawnMissEffect(laneXs[n.lane], hitZoneY);
                 _showFeedback('MISS', '#e74c3c');
             }
         });
@@ -240,6 +258,35 @@ const Game = (() => {
         // Decay effects
         if (beatPulse > 0) beatPulse -= 0.05;
         if (screenShake > 0) screenShake *= 0.9;
+
+        // Decay lane flash
+        for (let i = 0; i < LANES; i++) {
+            if (laneFlash[i] > 0) laneFlash[i] -= 0.05;
+            if (laneFlash[i] < 0) laneFlash[i] = 0;
+        }
+
+        // Update miss splash effects
+        const now = Date.now();
+        missEffects = missEffects.filter(e => {
+            const age = now - e.time;
+            if (age > 400) return false;
+            e.particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.15;
+            });
+            return true;
+        });
+
+        // Smooth combo meter toward target
+        const comboTarget = Math.min(combo / 20, 1.0);
+        if (comboMeterBreaking > 0) {
+            comboMeterValue *= 0.85; // fast shrink
+            comboMeterBreaking -= 0.05;
+            if (comboMeterBreaking <= 0) comboMeterValue = 0;
+        } else {
+            comboMeterValue += (comboTarget - comboMeterValue) * 0.1;
+        }
         if (hitFeedbackTimer > 0) {
             hitFeedbackTimer--;
             if (hitFeedbackTimer <= 0 && hitFeedbackEl) {
@@ -291,6 +338,31 @@ const Game = (() => {
             ctx.globalAlpha = 1;
         });
 
+        // Miss splash effects
+        const now = Date.now();
+        missEffects.forEach(e => {
+            const age = now - e.time;
+            const alpha = 1 - age / 400;
+            e.particles.forEach(p => {
+                ctx.globalAlpha = alpha * 0.8;
+                ctx.fillStyle = '#e74c3c';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            // Red flash ring
+            ctx.globalAlpha = alpha * 0.4;
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, 20 + age * 0.15, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+        });
+
+        // Combo visual meter (top center arc)
+        _drawComboMeter();
+
         ctx.restore();
     }
 
@@ -326,6 +398,17 @@ const Game = (() => {
             const laneAlpha = 0.06 + beatPulse * 0.04;
             ctx.fillStyle = LANE_GLOW[i].replace('0.3', String(laneAlpha));
             ctx.fillRect(x, 0, laneWidth, H);
+
+            // Lane activation flash on hit
+            if (laneFlash[i] > 0) {
+                const flashAlpha = laneFlash[i] * 0.3;
+                ctx.fillStyle = LANE_GLOW[i].replace('0.3', String(flashAlpha));
+                ctx.fillRect(x, 0, laneWidth, H);
+
+                // Bright flash at hit zone
+                ctx.fillStyle = LANE_GLOW[i].replace('0.3', String(laneFlash[i] * 0.5));
+                ctx.fillRect(x, hitZoneY - 30, laneWidth, 60);
+            }
 
             // Lane border lines
             ctx.strokeStyle = `rgba(255,255,255,0.08)`;
@@ -367,7 +450,11 @@ const Game = (() => {
         const y = note.y;
         const color = LANE_COLORS[note.lane];
         const isLead = note.type === 'sequence-lead';
-        const radius = isLead ? 24 : 36; // Large notes for kids (72px+ touch target)
+        const baseRadius = isLead ? 24 : 36;
+
+        // Breathing pulse: subtle size oscillation as notes fall
+        const breathe = Math.sin(Date.now() / 200 + (note.hitBeat || 0) * 1.5) * 3;
+        const radius = baseRadius + (isLead ? 0 : breathe);
 
         ctx.globalAlpha = note.alpha;
 
@@ -384,9 +471,20 @@ const Game = (() => {
             });
         }
 
+        // Outer glow ring (breathing, larger aura)
+        if (!isLead && !note.hit && !note.missed) {
+            const glowPulse = 0.08 + Math.sin(Date.now() / 250 + (note.hitBeat || 0)) * 0.05;
+            ctx.fillStyle = color;
+            ctx.globalAlpha = note.alpha * glowPulse;
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 8 + breathe * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = note.alpha;
+        }
+
         // Note glow
         ctx.shadowColor = color;
-        ctx.shadowBlur = 15 + beatPulse * 8;
+        ctx.shadowBlur = 15 + beatPulse * 8 + breathe;
 
         // Note body
         ctx.fillStyle = isLead ? 'rgba(255,255,255,0.15)' : color;
@@ -419,6 +517,68 @@ const Game = (() => {
         }
 
         ctx.globalAlpha = 1;
+    }
+
+    function _drawComboMeter() {
+        if (comboMeterValue < 0.01 && combo < 1) return;
+
+        const cx = W / 2;
+        const cy = 50;
+        const r = 22;
+
+        // Determine color based on combo level
+        let meterColor;
+        if (combo >= 20) {
+            meterColor = '#ffd700'; // gold
+        } else if (combo >= 10) {
+            meterColor = '#a855f7'; // purple
+        } else {
+            meterColor = '#22d3ee'; // cyan
+        }
+
+        // Background ring
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI * 1.5);
+        ctx.stroke();
+
+        // Filled arc
+        if (comboMeterValue > 0.005) {
+            const endAngle = -Math.PI / 2 + comboMeterValue * Math.PI * 2;
+            ctx.strokeStyle = meterColor;
+            ctx.lineWidth = 4;
+            ctx.shadowColor = meterColor;
+            ctx.shadowBlur = 8;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, -Math.PI / 2, endAngle);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // Center text (combo count)
+        if (combo >= 3) {
+            ctx.fillStyle = meterColor;
+            ctx.font = `bold 14px 'Fredoka One', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${combo}x`, cx, cy);
+        }
+    }
+
+    function _spawnMissEffect(x, y) {
+        const pArr = [];
+        const count = 8 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 / count) * i + Math.random() * 0.3;
+            const speed = 2 + Math.random() * 3;
+            pArr.push({
+                x: x, y: y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 1
+            });
+        }
+        missEffects.push({ x, y, time: Date.now(), particles: pArr });
     }
 
     // === INPUT HANDLING ===
@@ -480,6 +640,7 @@ const Game = (() => {
                 perfects++;
                 Audio.perfectHit();
                 screenShake = 2;
+                laneFlash[closestNote.lane] = 1.0;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, '#ffd700', 20);
             } else if (timeDist <= GREAT_WINDOW) {
                 points = 75;
@@ -487,6 +648,7 @@ const Game = (() => {
                 color = '#a855f7';
                 greats++;
                 Audio.greatHit();
+                laneFlash[closestNote.lane] = 0.7;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, LANE_COLORS[closestNote.lane], 12);
             } else {
                 points = 50;
@@ -494,6 +656,7 @@ const Game = (() => {
                 color = '#22d3ee';
                 oks++;
                 Audio.okHit();
+                laneFlash[closestNote.lane] = 0.4;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, LANE_COLORS[closestNote.lane], 6);
             }
 
@@ -525,9 +688,13 @@ const Game = (() => {
             // Wrong answer
             closestNote.hit = true; // Remove it
             misses++;
-            if (combo > 0) Audio.comboBreak();
+            if (combo > 0) {
+                Audio.comboBreak();
+                comboMeterBreaking = 1.0;
+            }
             combo = 0;
             Audio.miss();
+            _spawnMissEffect(laneXs[closestNote.lane], hitZoneY);
             _showFeedback('WRONG', '#e74c3c');
 
             noteResults.push({
@@ -603,11 +770,78 @@ const Game = (() => {
         }
     }
 
+    function startConfetti() {
+        // Create a confetti canvas overlay for the results screen
+        let confettiCanvas = document.getElementById('confetti-canvas');
+        if (!confettiCanvas) {
+            confettiCanvas = document.createElement('canvas');
+            confettiCanvas.id = 'confetti-canvas';
+            confettiCanvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60;';
+            document.body.appendChild(confettiCanvas);
+        }
+        confettiCanvas.width = window.innerWidth;
+        confettiCanvas.height = window.innerHeight;
+        confettiCanvas.style.display = 'block';
+
+        const cCtx = confettiCanvas.getContext('2d');
+        const colors = ['#ffd700', '#a855f7', '#22d3ee', '#ec4899', '#4ade80', '#f59e0b', '#e74c3c'];
+        const cParts = [];
+
+        for (let i = 0; i < 50; i++) {
+            cParts.push({
+                x: Math.random() * confettiCanvas.width,
+                y: -20 - Math.random() * 200,
+                w: 6 + Math.random() * 6,
+                h: 4 + Math.random() * 4,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                vy: 2 + Math.random() * 3,
+                vx: (Math.random() - 0.5) * 2,
+                spin: Math.random() * Math.PI * 2,
+                spinSpeed: (Math.random() - 0.5) * 0.2,
+                sway: Math.random() * Math.PI * 2,
+                swaySpeed: 0.02 + Math.random() * 0.03
+            });
+        }
+
+        const startTime = Date.now();
+        const duration = 2500;
+
+        function animConfetti() {
+            const elapsed = Date.now() - startTime;
+            if (elapsed > duration) {
+                confettiCanvas.style.display = 'none';
+                return;
+            }
+
+            cCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            const fadeAlpha = elapsed > duration - 500 ? (duration - elapsed) / 500 : 1;
+
+            cParts.forEach(p => {
+                p.y += p.vy;
+                p.x += p.vx + Math.sin(p.sway) * 0.5;
+                p.sway += p.swaySpeed;
+                p.spin += p.spinSpeed;
+
+                cCtx.save();
+                cCtx.globalAlpha = fadeAlpha;
+                cCtx.translate(p.x, p.y);
+                cCtx.rotate(p.spin);
+                cCtx.fillStyle = p.color;
+                cCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+                cCtx.restore();
+            });
+
+            requestAnimationFrame(animConfetti);
+        }
+
+        requestAnimationFrame(animConfetti);
+    }
+
     function getScore() { return score; }
     function getCombo() { return combo; }
 
     return {
         init, startSong, stop, pause, resume,
-        handleTap, getScore, getCombo
+        handleTap, getScore, getCombo, startConfetti
     };
 })();

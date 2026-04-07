@@ -269,6 +269,11 @@ const Main = (() => {
     function _onSongEnd(result) {
         showScreen('results');
 
+        // Confetti celebration
+        if (result.stars >= 1) {
+            Game.startConfetti();
+        }
+
         // Title
         const gradeColors = { S: '#ffd700', A: '#4ade80', B: '#22d3ee', C: '#f59e0b', D: '#e74c3c' };
         document.getElementById('results-grade').textContent = result.grade;
