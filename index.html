@@ -28,19 +28,61 @@
         <div class="title-bg">
             <div class="otb-badge" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:5;">Blake Boys Gaming</div>
             <canvas id="title-canvas" width="1024" height="600"></canvas>
+
+            <!-- Sound wave rings behind title -->
+            <div class="sound-waves">
+                <div class="sound-ring ring-1"></div>
+                <div class="sound-ring ring-2"></div>
+                <div class="sound-ring ring-3"></div>
+                <div class="sound-ring ring-4"></div>
+            </div>
+
+            <!-- Floating music note emojis -->
+            <div class="floating-notes">
+                <span class="fnote n1">🎵</span>
+                <span class="fnote n2">🎶</span>
+                <span class="fnote n3">🎸</span>
+                <span class="fnote n4">🥁</span>
+                <span class="fnote n5">🎹</span>
+                <span class="fnote n6">🎵</span>
+                <span class="fnote n7">🎶</span>
+                <span class="fnote n8">🎸</span>
+            </div>
+
+            <!-- Equalizer bars -->
+            <div class="eq-bars">
+                <div class="eq-bar b1"></div>
+                <div class="eq-bar b2"></div>
+                <div class="eq-bar b3"></div>
+                <div class="eq-bar b4"></div>
+                <div class="eq-bar b5"></div>
+                <div class="eq-bar b6"></div>
+                <div class="eq-bar b7"></div>
+                <div class="eq-bar b8"></div>
+                <div class="eq-bar b9"></div>
+                <div class="eq-bar b10"></div>
+                <div class="eq-bar b11"></div>
+                <div class="eq-bar b12"></div>
+            </div>
+
             <div class="title-overlay">
+                <!-- Player info card -->
+                <div class="player-card" id="player-card">
+                    <span class="player-card-level" id="player-level">Lv 1</span>
+                    <span class="player-card-name" id="player-name">Player</span>
+                </div>
+
                 <h1 class="game-title">RHYTHM<br><span class="title-accent">BLAST</span></h1>
+
                 <div class="title-buttons">
-                    <button class="otb-btn otb-btn-primary otb-btn-large" id="btn-play" aria-label="Play Game">🎵 Play</button>
+                    <button class="otb-btn title-play-btn" id="btn-play" aria-label="Play Game">
+                        <span class="play-icon">&#9654;</span> PLAY
+                    </button>
                     <div class="title-row">
-                        <button class="otb-btn otb-btn-secondary" id="btn-settings" aria-label="Open Settings">Settings</button>
-                        <button class="otb-btn otb-btn-secondary" id="btn-parent" aria-label="Parent Dashboard">Parents</button>
+                        <button class="otb-btn title-secondary-btn" id="btn-settings" aria-label="Open Settings">&#9881; Settings</button>
+                        <button class="otb-btn title-secondary-btn" id="btn-parent" aria-label="Parent Dashboard">&#128101; Parents</button>
                     </div>
                     <a id="hub-link" href="#" class="otb-btn otb-btn-small" style="opacity:0.5;text-decoration:none;">🎮 Hub</a>
-                </div>
-                <div class="player-info">
-                    <span class="player-name" id="player-name"></span>
-                    <span class="player-level" id="player-level"></span>
                 </div>
             </div>
         </div>
