@@ -15,7 +15,7 @@ const Game = (() => {
     let laneWidth = 0;
     let laneXs = [];
     let hitZoneY = 0;
-    const HIT_ZONE_HEIGHT = 8;
+    const HIT_ZONE_HEIGHT = 14;
 
     // Notes
     let activeNotes = []; // Currently visible on screen
@@ -23,11 +23,18 @@ const Game = (() => {
     let noteSpeed = 0; // pixels per frame
     const SPAWN_Y = -60; // Above screen
 
-    // Timing windows (ms) per difficulty
+    // Timing windows (ms) per difficulty — Easy is very forgiving for young kids
     const DIFFICULTY_WINDOWS = {
-        easy:   { PERFECT: 180, GREAT: 350, OK: 500 },
-        normal: { PERFECT: 120, GREAT: 250, OK: 400 },
+        easy:   { PERFECT: 300, GREAT: 500, OK: 700 },
+        normal: { PERFECT: 150, GREAT: 300, OK: 450 },
         hard:   { PERFECT: 80,  GREAT: 180, OK: 300 }
+    };
+
+    // Fall duration (seconds) per difficulty — how long a note takes to travel from spawn to hit zone
+    const DIFFICULTY_FALL_DURATION = {
+        easy:   6.0,   // 6 seconds — plenty of time to read and react
+        normal: 4.0,   // 4 seconds — comfortable
+        hard:   2.5    // 2.5 seconds — challenging
     };
 
     function _getWindows() {
@@ -96,7 +103,7 @@ const Game = (() => {
         canvas.height = H;
 
         // Lane geometry
-        const totalLaneWidth = W * 0.5; // lanes take center 50% of screen
+        const totalLaneWidth = W * 0.6; // lanes take center 60% of screen for wider tap targets
         laneWidth = totalLaneWidth / LANES;
         const laneStart = (W - totalLaneWidth) / 2;
         laneXs = [];
@@ -111,10 +118,13 @@ const Game = (() => {
         onSongEnd = endCallback;
         songBeatDuration = 60000 / song.bpm;
 
-        // Calculate note speed: notes should take ~3 seconds to fall from spawn to hit zone
-        // Slower = more visible and easier for a 6-year-old to react
+        // Calculate note speed based on difficulty
+        // Easy = 6s fall time (very slow, kids can read and react)
+        // Normal = 4s, Hard = 2.5s
+        const diff = (Progress.getSettings && Progress.getSettings().difficulty) || 'normal';
+        const fallDuration = DIFFICULTY_FALL_DURATION[diff] || DIFFICULTY_FALL_DURATION.normal;
         const fallDistance = hitZoneY - SPAWN_Y;
-        const fallFrames = (3000 / (1000 / 60)); // 3 seconds at 60fps
+        const fallFrames = (fallDuration * 1000 / (1000 / 60)); // convert seconds to frames at 60fps
         noteSpeed = fallDistance / fallFrames;
 
         // Reset state
@@ -141,6 +151,7 @@ const Game = (() => {
         // Generate all notes from chart
         noteQueue = [];
         const level = Progress.getLevel ? Progress.getLevel() : 0;
+        const fallDurationMs = fallDuration * 1000;
         song.noteChart.forEach(entry => {
             const { notes, ttsText } = NoteGenerator.fromChartEntry(entry, level);
             notes.forEach(n => {
@@ -150,7 +161,7 @@ const Game = (() => {
                     spawned: false,
                     hit: false,
                     missed: false,
-                    spawnBeat: Math.max(0, n.hitBeat - Math.round(3000 / songBeatDuration)), // spawn 3s before hit
+                    spawnBeat: Math.max(0, n.hitBeat - Math.round(fallDurationMs / songBeatDuration)), // spawn fallDuration before hit
                     alpha: 1
                 });
                 // Only count notes the player is expected to tap
@@ -159,7 +170,7 @@ const Game = (() => {
             // Schedule TTS for reading notes
             if (ttsText && notes[0]) {
                 const ttsNote = notes[0];
-                const ttsBeat = ttsNote.hitBeat - Math.round(4000 / songBeatDuration); // speak 4s before (1s before note appears)
+                const ttsBeat = ttsNote.hitBeat - Math.round((fallDurationMs + 1500) / songBeatDuration); // speak 1.5s before note appears
                 noteQueue.push({
                     _tts: true,
                     text: ttsText,
@@ -239,19 +250,34 @@ const Game = (() => {
         });
 
         // Check for missed notes (passed hit zone by too much)
+        // On Easy, use a bigger grace window before counting a miss
+        const diff = (Progress.getSettings && Progress.getSettings().difficulty) || 'normal';
+        const missThreshold = diff === 'easy' ? 100 : diff === 'normal' ? 75 : 60;
+
         activeNotes.forEach(n => {
-            if (!n.hit && !n.missed && n.y > hitZoneY + 60) {
+            if (!n.hit && !n.missed && n.y > hitZoneY + missThreshold) {
                 n.missed = true;
                 if (n.type === 'sequence-lead') return; // lead notes auto-pass
                 if (n.type === 'sequence-answer' && !n.isCorrect) return; // wrong answer in sequence, don't count
                 misses++;
-                if (combo > 0) {
-                    Audio.comboBreak();
-                    comboMeterBreaking = 1.0;
+
+                if (diff === 'easy') {
+                    // On Easy: softer punishment. Don't break combo for first miss, just reduce it
+                    if (combo > 2) {
+                        combo = Math.max(0, combo - 2);
+                    } else {
+                        combo = 0;
+                    }
+                    _showFeedback('MISS', '#f59e0b'); // amber instead of angry red
+                } else {
+                    if (combo > 0) {
+                        Audio.comboBreak();
+                        comboMeterBreaking = 1.0;
+                    }
+                    combo = 0;
+                    _spawnMissEffect(laneXs[n.lane], hitZoneY);
+                    _showFeedback('MISS', '#e74c3c');
                 }
-                combo = 0;
-                _spawnMissEffect(laneXs[n.lane], hitZoneY);
-                _showFeedback('MISS', '#e74c3c');
             }
         });
 
@@ -422,9 +448,9 @@ const Game = (() => {
                 ctx.fillRect(x, hitZoneY - 30, laneWidth, 60);
             }
 
-            // Lane border lines
-            ctx.strokeStyle = `rgba(255,255,255,0.08)`;
-            ctx.lineWidth = 1;
+            // Lane border lines — more visible for lane clarity
+            ctx.strokeStyle = `rgba(255,255,255,0.15)`;
+            ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, H);
@@ -444,13 +470,19 @@ const Game = (() => {
         ctx.fillRect(laneStart, hitZoneY - HIT_ZONE_HEIGHT / 2, totalLaneWidth, HIT_ZONE_HEIGHT * pulse);
         ctx.shadowBlur = 0;
 
-        // Lane target circles
+        // Lane target circles — larger and more visible
         for (let i = 0; i < LANES; i++) {
-            ctx.strokeStyle = LANE_COLORS[i];
-            ctx.lineWidth = 2 + beatPulse * 1;
-            ctx.globalAlpha = 0.4 + beatPulse * 0.3;
+            // Filled target background for visibility
+            ctx.fillStyle = LANE_GLOW[i].replace('0.3', '0.12');
             ctx.beginPath();
-            ctx.arc(laneXs[i], hitZoneY, 20 + beatPulse * 4, 0, Math.PI * 2);
+            ctx.arc(laneXs[i], hitZoneY, 34 + beatPulse * 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = LANE_COLORS[i];
+            ctx.lineWidth = 3 + beatPulse * 2;
+            ctx.globalAlpha = 0.5 + beatPulse * 0.3;
+            ctx.beginPath();
+            ctx.arc(laneXs[i], hitZoneY, 34 + beatPulse * 5, 0, Math.PI * 2);
             ctx.stroke();
             ctx.globalAlpha = 1;
         }
@@ -462,7 +494,7 @@ const Game = (() => {
         const y = note.y;
         const color = LANE_COLORS[note.lane];
         const isLead = note.type === 'sequence-lead';
-        const baseRadius = isLead ? 24 : 36;
+        const baseRadius = isLead ? 26 : 42;
 
         // Breathing pulse: subtle size oscillation as notes fall
         const breathe = Math.sin(Date.now() / 200 + (note.hitBeat || 0) * 1.5) * 3;
@@ -512,9 +544,18 @@ const Game = (() => {
 
         ctx.shadowBlur = 0;
 
-        // Text on note
+        // High-contrast dark background behind text for readability
+        if (!isLead) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.beginPath();
+            ctx.arc(x, y, radius - 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Text on note — large and bold for kids to read
         ctx.fillStyle = isLead ? 'rgba(255,255,255,0.6)' : '#fff';
-        ctx.font = `bold ${isLead ? 14 : 20}px 'Fredoka One', sans-serif`;
+        const fontSize = isLead ? 16 : (note.text.length > 4 ? 22 : 28);
+        ctx.font = `bold ${fontSize}px 'Fredoka One', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const displayText = note.text.length > 6 ? note.text.substring(0, 6) : note.text;
