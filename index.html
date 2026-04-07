@@ -8,6 +8,8 @@
     <meta name="theme-color" content="#1a1a2e">
     <title>Rhythm Blast — Blake Boys Gaming</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="stylesheet" href="css/shared/design-system.css">
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -25,8 +27,9 @@
 
     <!-- Title Screen -->
     <div id="screen-title" class="screen">
+        <div class="otb-badge" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:15;">Blake Boys Gaming</div>
+        <a id="bbg-logo-link" href="#" class="bbg-corner-logo-link" aria-label="Return to Hub"><img src="assets/bbg-logo.png" alt="BBG" class="bbg-corner-logo"></a>
         <div class="title-bg">
-            <div class="otb-badge" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:5;">Blake Boys Gaming</div>
             <canvas id="title-canvas" width="1024" height="600"></canvas>
 
             <!-- Sound wave rings behind title -->
@@ -74,6 +77,12 @@
 
                 <h1 class="game-title">RHYTHM<br><span class="title-accent">BLAST</span></h1>
 
+                <div class="title-stats-row" id="title-stats-row">
+                    <span class="title-stars-badge" id="title-stars-badge">⭐ 0 Stars</span>
+                    <span class="title-streak-badge" id="title-streak-badge" style="display:none;"></span>
+                    <span class="title-achievement-count" id="title-achievement-count" style="display:none;"></span>
+                </div>
+
                 <div class="title-buttons">
                     <button class="otb-btn title-play-btn" id="btn-play" aria-label="Play Game">
                         <span class="play-icon">&#9654;</span> PLAY
@@ -82,7 +91,7 @@
                         <button class="otb-btn title-secondary-btn" id="btn-settings" aria-label="Open Settings">&#9881; Settings</button>
                         <button class="otb-btn title-secondary-btn" id="btn-parent" aria-label="Parent Dashboard">&#128101; Parents</button>
                     </div>
-                    <a id="hub-link" href="#" class="otb-btn otb-btn-small" style="opacity:0.5;text-decoration:none;">🎮 Hub</a>
+                    <a id="hub-link" href="#" class="otb-btn otb-btn-small" style="display:none;opacity:0.5;text-decoration:none;">🎮 Hub</a>
                 </div>
             </div>
         </div>
@@ -104,6 +113,7 @@
         <canvas id="game-canvas"></canvas>
         <div class="game-hud">
             <div class="hud-left">
+                <button class="otb-btn otb-btn-small hud-back" id="btn-hud-back" aria-label="Exit Song">&#9664; Exit</button>
                 <span class="hud-score" id="hud-score" aria-live="polite">0</span>
                 <span class="hud-combo" id="hud-combo" aria-live="polite"></span>
             </div>
@@ -240,9 +250,10 @@
     <script src="js/progress.js"></script>
     <script src="js/otb-config.js"></script>
     <script src="js/ecosystem.js"></script>
+    <script src="js/achievements.js"></script>
     <script src="js/main.js"></script>
     <script>
-        if(typeof OTBConfig!=='undefined'){const h=document.getElementById('hub-link');if(h)h.href=OTBConfig.getHubUrl();}
+        if(typeof OTBConfig!=='undefined'){const u=OTBConfig.getHubUrl();const h=document.getElementById('hub-link');if(h)h.href=u;const l=document.getElementById('bbg-logo-link');if(l)l.href=u;}
         if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
     </script>
 </body>

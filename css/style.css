@@ -568,6 +568,20 @@ html, body {
     font-size: 0.7rem;
     color: var(--otb-text-muted);
 }
+.hud-back {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+    min-width: auto;
+    min-height: auto;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid var(--otb-border);
+    border-radius: 8px;
+    color: var(--otb-text-muted);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.hud-back:hover { background: rgba(0,0,0,0.7); color: #fff; }
+
 .hud-pause {
     min-width: 72px;
     min-height: 72px;

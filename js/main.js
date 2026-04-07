@@ -80,6 +80,13 @@ const Main = (() => {
         document.getElementById('btn-pause').addEventListener('click', _pauseGame);
         document.getElementById('btn-resume').addEventListener('click', _resumeGame);
         document.getElementById('btn-quit').addEventListener('click', _quitSong);
+        document.getElementById('btn-hud-back').addEventListener('click', () => {
+            Game.stop();
+            if (_countdownInterval) { clearInterval(_countdownInterval); _countdownInterval = null; }
+            document.getElementById('countdown').style.display = 'none';
+            document.getElementById('pause-overlay').style.display = 'none';
+            showScreen('title');
+        });
 
         // Results buttons
         document.getElementById('btn-replay').addEventListener('click', () => {
