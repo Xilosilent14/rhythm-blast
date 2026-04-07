@@ -23,7 +23,19 @@ const Game = (() => {
     let noteSpeed = 0; // pixels per frame
     const SPAWN_Y = -60; // Above screen
 
-    // Timing windows (ms)
+    // Timing windows (ms) per difficulty
+    const DIFFICULTY_WINDOWS = {
+        easy:   { PERFECT: 180, GREAT: 350, OK: 500 },
+        normal: { PERFECT: 120, GREAT: 250, OK: 400 },
+        hard:   { PERFECT: 80,  GREAT: 180, OK: 300 }
+    };
+
+    function _getWindows() {
+        const diff = (Progress.getSettings && Progress.getSettings().difficulty) || 'normal';
+        return DIFFICULTY_WINDOWS[diff] || DIFFICULTY_WINDOWS.normal;
+    }
+
+    // Legacy constants (kept for reference, actual values come from _getWindows())
     const PERFECT_WINDOW = 120;
     const GREAT_WINDOW = 250;
     const OK_WINDOW = 400;
@@ -585,6 +597,8 @@ const Game = (() => {
     function handleTap(x, y) {
         if (!running) return;
 
+        const W = _getWindows();
+
         // Determine which lane was tapped
         let tappedLane = -1;
         for (let i = 0; i < LANES; i++) {
@@ -606,7 +620,7 @@ const Game = (() => {
                 // Auto-pass lead notes when tapped (guard against double-hit)
                 if (n.hit) return;
                 const dist = Math.abs(n.y - hitZoneY);
-                if (dist < OK_WINDOW / (1000 / 60) * noteSpeed + 40) {
+                if (dist < W.OK / (1000 / 60) * noteSpeed + 40) {
                     n.hit = true;
                     _spawnParticles(laneXs[n.lane], hitZoneY, LANE_COLORS[n.lane], 5);
                 }
@@ -625,7 +639,7 @@ const Game = (() => {
         const pixelDist = Math.abs(closestNote.y - hitZoneY);
         const timeDist = (pixelDist / noteSpeed) * (1000 / 60); // convert to ms
 
-        if (timeDist > OK_WINDOW) return; // Too far, ignore tap
+        if (timeDist > W.OK) return; // Too far, ignore tap
 
         if (closestNote.isCorrect) {
             closestNote.hit = true;
@@ -633,7 +647,7 @@ const Game = (() => {
             let label = '';
             let color = '';
 
-            if (timeDist <= PERFECT_WINDOW) {
+            if (timeDist <= W.PERFECT) {
                 points = 100;
                 label = 'PERFECT!';
                 color = '#ffd700';
@@ -642,7 +656,7 @@ const Game = (() => {
                 screenShake = 2;
                 laneFlash[closestNote.lane] = 1.0;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, '#ffd700', 20);
-            } else if (timeDist <= GREAT_WINDOW) {
+            } else if (timeDist <= W.GREAT) {
                 points = 75;
                 label = 'GREAT!';
                 color = '#a855f7';

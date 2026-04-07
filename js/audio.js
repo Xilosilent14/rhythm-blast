@@ -6,8 +6,12 @@
 const Audio = (() => {
     let ctx = null;
     let masterGain = null;
+    let compressor = null;
     let musicGain = null;
     let sfxGain = null;
+    let reverbGain = null;
+    let reverbDry = null;
+    let padGain = null;
     let unlocked = false;
     let settings = { sfx: true, music: true, voice: true };
 
@@ -15,23 +19,86 @@ const Audio = (() => {
     const MASTER_VOL = 0.7;
     const MUSIC_VOL = 0.3;
     const SFX_VOL = 0.5;
+    const REVERB_WET = 0.15;
+    const PAD_VOL = 0.08;
 
     function _getCtx() {
         if (!ctx) {
             ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Master compressor for even volume
+            compressor = ctx.createDynamicsCompressor();
+            compressor.threshold.value = -24;
+            compressor.knee.value = 12;
+            compressor.ratio.value = 4;
+            compressor.attack.value = 0.003;
+            compressor.release.value = 0.15;
+            compressor.connect(ctx.destination);
+
             masterGain = ctx.createGain();
             masterGain.gain.value = MASTER_VOL;
-            masterGain.connect(ctx.destination);
+            masterGain.connect(compressor);
+
+            // Reverb send (feedback delay network)
+            reverbGain = ctx.createGain();
+            reverbGain.gain.value = REVERB_WET;
+            reverbDry = ctx.createGain();
+            reverbDry.gain.value = 1.0;
+            _setupReverb();
 
             musicGain = ctx.createGain();
             musicGain.gain.value = MUSIC_VOL;
-            musicGain.connect(masterGain);
+            musicGain.connect(reverbDry);
+            musicGain.connect(reverbGain);
+
+            // Pad layer gain
+            padGain = ctx.createGain();
+            padGain.gain.value = PAD_VOL;
+            padGain.connect(reverbDry);
+            padGain.connect(reverbGain);
 
             sfxGain = ctx.createGain();
             sfxGain.gain.value = SFX_VOL;
             sfxGain.connect(masterGain);
         }
         return ctx;
+    }
+
+    // Delay-based reverb (feedback delay with filtering)
+    function _setupReverb() {
+        const c = ctx;
+        // Two delay taps for a wider sound
+        const delay1 = c.createDelay(0.5);
+        delay1.delayTime.value = 0.12;
+        const delay2 = c.createDelay(0.5);
+        delay2.delayTime.value = 0.19;
+
+        const feedback1 = c.createGain();
+        feedback1.gain.value = 0.3;
+        const feedback2 = c.createGain();
+        feedback2.gain.value = 0.25;
+
+        // Low-pass filter on feedback to darken the tail
+        const lpf = c.createBiquadFilter();
+        lpf.type = 'lowpass';
+        lpf.frequency.value = 3000;
+
+        // Reverb chain: reverbGain -> delay1 -> lpf -> feedback1 -> delay1 (loop)
+        reverbGain.connect(delay1);
+        delay1.connect(lpf);
+        lpf.connect(feedback1);
+        feedback1.connect(delay1);
+
+        reverbGain.connect(delay2);
+        delay2.connect(feedback2);
+        feedback2.connect(delay2);
+
+        // Mix wet signal to master
+        delay1.connect(masterGain);
+        delay2.connect(masterGain);
+
+        // Dry signal to master
+        reverbDry.connect(masterGain);
     }
 
     function unlock() {
@@ -140,6 +207,9 @@ const Audio = (() => {
     let currentBPM = 120;
     let beatCallback = null;
 
+    // Active pad oscillators (cleaned up on stop)
+    let activePadOscs = [];
+
     function startSong(song, onBeat) {
         const c = _getCtx();
         currentSongMelody = song.melody || [];
@@ -151,6 +221,11 @@ const Audio = (() => {
         const beatDuration = 60 / song.bpm; // seconds per beat
         const songStartTime = c.currentTime;
         let lastScheduledBeat = -1;
+
+        // Start pad layer (sustained chords underneath melody)
+        if (settings.music) {
+            _startPadLayer(song);
+        }
 
         // Lookahead scheduler: checks every 25ms, schedules 100ms ahead
         // This prevents timing drift that setInterval causes
@@ -181,17 +256,8 @@ const Audio = (() => {
                         }
                     }
 
-                    // Drums
-                    const bib = bi % 4;
-                    if (bib === 0 || bib === 2) {
-                        _scheduleNote(80, beatTime, 0.12, 'sine', musicGain, 0.3);
-                        _scheduleNote(40, beatTime + 0.01, 0.06, 'sine', musicGain, 0.2);
-                    }
-                    if (bib === 1 || bib === 3) {
-                        _scheduleNote(200, beatTime, 0.06, 'square', musicGain, 0.12);
-                    }
-                    // Hi-hat every beat
-                    _scheduleNote(6000 + (bi * 137 % 3000), beatTime, 0.02, 'square', musicGain, 0.04);
+                    // Improved drums
+                    _scheduleDrums(bi, beatTime, beatDuration);
                 }
 
                 // Fire visual beat callback
@@ -200,6 +266,146 @@ const Audio = (() => {
 
             beatIndex = currentBeat;
         }, 25); // 25ms lookahead interval (tight, drift-free)
+    }
+
+    // Punchy kick: sine sweep from 180Hz down to 50Hz
+    function _scheduleKick(time) {
+        const c = ctx;
+        try {
+            const osc = c.createOscillator();
+            const env = c.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(180, time);
+            osc.frequency.exponentialRampToValueAtTime(50, time + 0.08);
+            env.gain.setValueAtTime(0.35, time);
+            env.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+            osc.connect(env);
+            env.connect(musicGain);
+            osc.start(time);
+            osc.stop(time + 0.16);
+        } catch (e) {}
+    }
+
+    // Snare: noise burst + sine body
+    function _scheduleSnare(time) {
+        const c = ctx;
+        try {
+            // Noise burst (using high-freq oscillator trick)
+            const bufferSize = c.sampleRate * 0.08;
+            const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.5;
+            }
+            const noise = c.createBufferSource();
+            noise.buffer = buffer;
+            const noiseFilter = c.createBiquadFilter();
+            noiseFilter.type = 'highpass';
+            noiseFilter.frequency.value = 2000;
+            const noiseEnv = c.createGain();
+            noiseEnv.gain.setValueAtTime(0.2, time);
+            noiseEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseEnv);
+            noiseEnv.connect(musicGain);
+            noise.start(time);
+            noise.stop(time + 0.1);
+
+            // Sine body
+            const osc = c.createOscillator();
+            const env = c.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(200, time);
+            osc.frequency.exponentialRampToValueAtTime(120, time + 0.05);
+            env.gain.setValueAtTime(0.18, time);
+            env.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+            osc.connect(env);
+            env.connect(musicGain);
+            osc.start(time);
+            osc.stop(time + 0.12);
+        } catch (e) {}
+    }
+
+    // Hi-hat: filtered noise, short and crispy
+    function _scheduleHiHat(time, open) {
+        const c = ctx;
+        try {
+            const dur = open ? 0.08 : 0.03;
+            const bufferSize = c.sampleRate * dur;
+            const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1);
+            }
+            const noise = c.createBufferSource();
+            noise.buffer = buffer;
+            const hpf = c.createBiquadFilter();
+            hpf.type = 'highpass';
+            hpf.frequency.value = 7000;
+            const env = c.createGain();
+            env.gain.setValueAtTime(open ? 0.06 : 0.04, time);
+            env.gain.exponentialRampToValueAtTime(0.001, time + dur);
+            noise.connect(hpf);
+            hpf.connect(env);
+            env.connect(musicGain);
+            noise.start(time);
+            noise.stop(time + dur + 0.01);
+        } catch (e) {}
+    }
+
+    // Drum pattern scheduler
+    function _scheduleDrums(beatIndex, beatTime, beatDuration) {
+        const bib = beatIndex % 4;
+        // Kick on 1 and 3
+        if (bib === 0 || bib === 2) {
+            _scheduleKick(beatTime);
+        }
+        // Snare on 2 and 4
+        if (bib === 1 || bib === 3) {
+            _scheduleSnare(beatTime);
+        }
+        // Hi-hat every beat, open on upbeats
+        _scheduleHiHat(beatTime, bib === 1 || bib === 3);
+        // Extra hi-hat on the "and" of each beat for groove
+        _scheduleHiHat(beatTime + beatDuration * 0.5, false);
+    }
+
+    // Pad/harmony layer: sustained chords from the song's bass notes
+    function _startPadLayer(song) {
+        _stopPadLayer();
+        const c = _getCtx();
+        if (!song.bass || song.bass.length === 0) return;
+
+        // Derive chord from first bass note (root, major third, fifth)
+        const root = song.bass[0];
+        const chordFreqs = [root, root * 1.25, root * 1.5]; // root, M3, P5
+
+        chordFreqs.forEach(freq => {
+            try {
+                const osc = c.createOscillator();
+                const env = c.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq * 2; // one octave up for warmth
+                env.gain.setValueAtTime(0, c.currentTime);
+                env.gain.linearRampToValueAtTime(1.0, c.currentTime + 2); // slow fade in
+                osc.connect(env);
+                env.connect(padGain);
+                osc.start(c.currentTime);
+                activePadOscs.push({ osc, env });
+            } catch (e) {}
+        });
+    }
+
+    function _stopPadLayer() {
+        const c = ctx;
+        if (!c) return;
+        activePadOscs.forEach(({ osc, env }) => {
+            try {
+                env.gain.linearRampToValueAtTime(0, c.currentTime + 0.3);
+                osc.stop(c.currentTime + 0.4);
+            } catch (e) {}
+        });
+        activePadOscs = [];
     }
 
     // Schedule a note at a precise audio time (drift-free)
@@ -225,6 +431,7 @@ const Audio = (() => {
             clearInterval(beatInterval);
             beatInterval = null;
         }
+        _stopPadLayer();
         beatIndex = 0;
         beatCallback = null;
     }

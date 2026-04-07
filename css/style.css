@@ -156,6 +156,33 @@ html, body {
 .player-name { color: var(--otb-coin); font-family: var(--otb-font-heading); }
 .player-level { color: var(--otb-text-muted); }
 
+/* ============ DIFFICULTY SELECTOR ============ */
+.difficulty-selector {
+    display: flex;
+    gap: 6px;
+}
+.diff-btn {
+    padding: 6px 14px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    color: var(--otb-text-muted);
+    font-family: var(--otb-font-heading);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.diff-btn:hover {
+    border-color: var(--game-accent);
+    color: #fff;
+}
+.diff-btn.active {
+    background: var(--game-accent);
+    border-color: var(--game-accent);
+    color: #fff;
+    box-shadow: 0 0 10px var(--game-accent-glow);
+}
+
 /* ============ SONG SELECT ============ */
 .songs-content {
     flex: 1;
@@ -422,13 +449,73 @@ html, body {
 }
 
 /* ============ RESPONSIVE ============ */
-@media (max-height: 650px) {
-    .game-title { font-size: 2.2rem; }
-    .title-accent { font-size: 1.8rem; }
-}
-
 @media (max-width: 600px) {
     .songs-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ===== TABLET LANDSCAPE (1024x600 Fire tablet) ===== */
+@media (max-height: 650px) and (orientation: landscape) {
+    /* Title screen */
+    .game-title { font-size: 2.2rem; }
+    .title-accent { font-size: 1.8rem; }
+    .title-overlay { gap: 10px; }
+    .title-buttons { gap: 8px; }
+    .player-info { font-size: 0.7rem; }
+
+    /* Screen headers */
+    .screen-header { padding: 6px 14px; }
+    .screen-header h2 { font-size: 1.1rem; }
+
+    /* Song select */
+    .songs-content { padding: 10px 16px; }
+    .songs-grid { gap: 10px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+    .song-banner { height: 60px; font-size: 1.5rem; }
+    .song-info { padding: 6px 10px; }
+    .song-name { font-size: 0.8rem; }
+    .song-meta { font-size: 0.6rem; }
+
+    /* Game HUD */
+    .game-hud { padding: 4px 12px; }
+    .hud-score { font-size: 1.1rem; }
+    .hud-combo { font-size: 0.85rem; }
+    .hud-song-name { font-size: 0.6rem; }
+    .hud-pause { min-width: 56px; min-height: 56px; font-size: 1.1rem; }
+
+    /* Hit feedback */
+    .hit-feedback { bottom: 90px; font-size: 1.2rem; }
+
+    /* Countdown */
+    .countdown-num { font-size: 3.5rem; }
+
+    /* Results */
+    .results-content { gap: 8px; }
+    .results-title { font-size: 1.4rem; }
+    .results-grade { font-size: 2.2rem; margin: 4px 0; }
+    .results-stats { font-size: 0.75rem; line-height: 1.6; }
+    .results-xp { font-size: 0.9rem; }
+    .results-buttons { gap: 8px; margin-top: 4px; }
+
+    /* Pause */
+    .pause-panel { padding: 20px; gap: 10px; }
+
+    /* Settings */
+    .settings-content, .parent-content { padding: 12px; gap: 12px; }
+}
+
+/* ===== LANDSCAPE LOCK HINT ===== */
+@media (orientation: portrait) {
+    body::before {
+        content: 'Please rotate your device for the best experience!';
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: var(--game-accent);
+        color: #fff;
+        text-align: center;
+        padding: 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        z-index: 9999;
+    }
 }
 
 /* ============ FOCUS STYLES ============ */

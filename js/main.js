@@ -100,6 +100,9 @@ const Main = (() => {
             });
         });
 
+        // Difficulty selector
+        _setupDifficulty();
+
         // Parent lock
         _setupParentLock();
 
@@ -314,6 +317,21 @@ const Main = (() => {
         Game.stop();
         document.getElementById('pause-overlay').style.display = 'none';
         showScreen('songs');
+    }
+
+    function _setupDifficulty() {
+        const selector = document.getElementById('difficulty-selector');
+        if (!selector) return;
+        const current = Progress.getSettings().difficulty || 'normal';
+        // Set initial active state
+        selector.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.diff === current);
+            btn.addEventListener('click', () => {
+                selector.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                Progress.saveSetting('difficulty', btn.dataset.diff);
+            });
+        });
     }
 
     function _setupParentLock() {

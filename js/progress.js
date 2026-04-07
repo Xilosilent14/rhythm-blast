@@ -12,7 +12,7 @@ const Progress = (() => {
             totalStars: 0,
             totalXP: 0,
             totalPlays: 0,
-            settings: { sfx: true, music: true, voice: true },
+            settings: { sfx: true, music: true, voice: true, difficulty: 'normal' },
             createdAt: Date.now()
         };
     }

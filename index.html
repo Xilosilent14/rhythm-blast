@@ -62,8 +62,8 @@
         <canvas id="game-canvas"></canvas>
         <div class="game-hud">
             <div class="hud-left">
-                <span class="hud-score" id="hud-score">0</span>
-                <span class="hud-combo" id="hud-combo"></span>
+                <span class="hud-score" id="hud-score" aria-live="polite">0</span>
+                <span class="hud-combo" id="hud-combo" aria-live="polite"></span>
             </div>
             <div class="hud-center">
                 <span class="hud-song-name" id="hud-song-name"></span>
@@ -73,7 +73,7 @@
             </div>
         </div>
         <!-- Hit feedback overlay -->
-        <div class="hit-feedback" id="hit-feedback"></div>
+        <div class="hit-feedback" id="hit-feedback" aria-live="assertive"></div>
         <!-- Countdown overlay -->
         <div class="countdown-overlay" id="countdown" style="display:none;">
             <span class="countdown-num" id="countdown-num">3</span>
@@ -113,9 +113,9 @@
         </div>
         <div class="settings-content">
             <div class="otb-settings-group">
-                <div class="otb-settings-item on" id="setting-sfx" data-setting="sfx">
+                <div class="otb-settings-item on" id="setting-sfx" data-setting="sfx" role="switch" aria-checked="true" aria-label="Sound Effects" tabindex="0">
                     <div class="otb-settings-item-info">
-                        <span class="otb-settings-icon">🔊</span>
+                        <span class="otb-settings-icon" aria-hidden="true">🔊</span>
                         <div>
                             <div class="otb-settings-label">Sound Effects</div>
                             <div class="otb-settings-desc">Hit sounds and feedback</div>
@@ -123,9 +123,9 @@
                     </div>
                     <div class="otb-toggle-track on"><div class="otb-toggle-thumb"></div></div>
                 </div>
-                <div class="otb-settings-item on" id="setting-music" data-setting="music">
+                <div class="otb-settings-item on" id="setting-music" data-setting="music" role="switch" aria-checked="true" aria-label="Background Music" tabindex="0">
                     <div class="otb-settings-item-info">
-                        <span class="otb-settings-icon">🎵</span>
+                        <span class="otb-settings-icon" aria-hidden="true">🎵</span>
                         <div>
                             <div class="otb-settings-label">Background Music</div>
                             <div class="otb-settings-desc">Song backing tracks</div>
@@ -133,9 +133,9 @@
                     </div>
                     <div class="otb-toggle-track on"><div class="otb-toggle-thumb"></div></div>
                 </div>
-                <div class="otb-settings-item on" id="setting-voice" data-setting="voice">
+                <div class="otb-settings-item on" id="setting-voice" data-setting="voice" role="switch" aria-checked="true" aria-label="Voice Read Aloud" tabindex="0">
                     <div class="otb-settings-item-info">
-                        <span class="otb-settings-icon">🗣️</span>
+                        <span class="otb-settings-icon" aria-hidden="true">🗣️</span>
                         <div>
                             <div class="otb-settings-label">Voice (Read Aloud)</div>
                             <div class="otb-settings-desc">Words spoken for reading notes</div>
@@ -144,9 +144,25 @@
                     <div class="otb-toggle-track on"><div class="otb-toggle-thumb"></div></div>
                 </div>
             </div>
+            <div class="otb-settings-group">
+                <div class="otb-settings-item" style="cursor:default;">
+                    <div class="otb-settings-item-info">
+                        <span class="otb-settings-icon">🎯</span>
+                        <div>
+                            <div class="otb-settings-label">Difficulty</div>
+                            <div class="otb-settings-desc">Timing window for hits</div>
+                        </div>
+                    </div>
+                    <div class="difficulty-selector" id="difficulty-selector">
+                        <button class="diff-btn" data-diff="easy" aria-label="Easy difficulty">Easy</button>
+                        <button class="diff-btn active" data-diff="normal" aria-label="Normal difficulty">Normal</button>
+                        <button class="diff-btn" data-diff="hard" aria-label="Hard difficulty">Hard</button>
+                    </div>
+                </div>
+            </div>
             <div class="otb-about">
                 <div class="otb-about-text">Part of the Blake Boys Gaming family</div>
-                <div class="otb-about-version">Rhythm Blast v1.0</div>
+                <div class="otb-about-version">Rhythm Blast v1.1</div>
             </div>
         </div>
     </div>

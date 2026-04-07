@@ -296,6 +296,146 @@ const SongData = (() => {
                 { beat: 70, type: 'identify', topic: 'math:counting' }
             ]
         }
+        // --- NEW SONGS ---
+        {
+            id: 'jungle-groove',
+            name: 'Jungle Groove',
+            album: 'adventure-tracks',
+            bpm: 95,
+            difficulty: 2,
+            starsRequired: 8,
+            emoji: '🌴',
+            bannerClass: 'banner-highway',
+            themes: ['jungle', 'tropical'],
+            topics: { math: ['subtraction'], reading: ['rhyming'] },
+            // C major bouncy: C4, E4, G4, A4, C5 with rests for bounce
+            melody: [
+                S.C4, 0, S.E4, S.G4, S.A4, 0, S.G4, S.E4,
+                S.C4, S.E4, 0, S.G4, S.C5, S.A4, S.G4, 0
+            ],
+            // Walking bass line
+            bass: [S.C4/2, S.D4/2, S.E4/2, S.G4/2, S.A4/2, S.G4/2, S.E4/2, S.D4/2],
+            noteChart: [
+                { beat: 3,  type: 'identify', topic: 'reading:rhyming' },
+                { beat: 6,  type: 'identify', topic: 'math:subtraction' },
+                { beat: 9,  type: 'identify', topic: 'reading:rhyming' },
+                { beat: 12, type: 'sequence', topic: 'math:subtraction', length: 3 },
+                { beat: 18, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 21, type: 'identify', topic: 'math:subtraction' },
+                { beat: 24, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 27, type: 'sequence', topic: 'math:subtraction', length: 3 },
+                { beat: 33, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 36, type: 'identify', topic: 'math:subtraction' },
+                { beat: 39, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 42, type: 'sequence', topic: 'math:subtraction', length: 3 },
+                { beat: 48, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 51, type: 'identify', topic: 'math:subtraction' },
+                { beat: 54, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 57, type: 'sequence', topic: 'math:subtraction', length: 3 },
+                { beat: 63, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 66, type: 'identify', topic: 'math:subtraction' },
+                { beat: 69, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 72, type: 'identify', topic: 'math:subtraction' }
+            ]
+        },
+        {
+            id: 'castle-quest',
+            name: 'Castle Quest',
+            album: 'adventure-tracks',
+            bpm: 115,
+            difficulty: 3,
+            starsRequired: 16,
+            emoji: '🏰',
+            bannerClass: 'banner-hyrule',
+            themes: ['medieval', 'adventure'],
+            topics: { math: ['multiplication'], reading: ['vocabulary'] },
+            // D minor heroic: D4, F4, A4, D5 ascending with drama
+            melody: [
+                293.66, 349.23, S.A4, 587.33, S.A4, 349.23, 293.66, 0,
+                349.23, S.A4, 587.33, 659.25, 587.33, S.A4, 349.23, 293.66,
+                293.66, 349.23, S.A4, 587.33, 659.25, 587.33, S.A4, 0,
+                349.23, 293.66, 349.23, S.A4, 587.33, 659.25, 0, 0
+            ],
+            // D minor power bass (root-fifth pattern)
+            bass: [146.83, 146.83, 220, 220, 174.61, 174.61, 220, 220,
+                   146.83, 146.83, 220, 220, 174.61, 220, 146.83, 146.83],
+            noteChart: [
+                { beat: 3,  type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 6,  type: 'identify', topic: 'math:multiplication' },
+                { beat: 9,  type: 'sequence', topic: 'math:multiplication', length: 3 },
+                { beat: 15, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 18, type: 'identify', topic: 'math:multiplication' },
+                { beat: 21, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 24, type: 'sequence', topic: 'math:multiplication', length: 3 },
+                { beat: 30, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 33, type: 'identify', topic: 'math:multiplication' },
+                { beat: 36, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 39, type: 'sequence', topic: 'math:multiplication', length: 3 },
+                { beat: 45, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 48, type: 'identify', topic: 'math:multiplication' },
+                { beat: 51, type: 'sequence', topic: 'math:multiplication', length: 3 },
+                { beat: 57, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 60, type: 'identify', topic: 'math:multiplication' },
+                { beat: 63, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 66, type: 'sequence', topic: 'math:multiplication', length: 3 },
+                { beat: 72, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 75, type: 'identify', topic: 'math:multiplication' },
+                { beat: 78, type: 'sequence', topic: 'math:multiplication', length: 3 },
+                { beat: 84, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 87, type: 'identify', topic: 'math:multiplication' },
+                { beat: 90, type: 'identify', topic: 'reading:vocabulary' }
+            ]
+        },
+        {
+            id: 'rocket-launch',
+            name: 'Rocket Launch',
+            album: 'adventure-tracks',
+            bpm: 125,
+            difficulty: 3,
+            starsRequired: 20,
+            emoji: '🚀',
+            bannerClass: 'banner-stadium',
+            themes: ['space', 'electronic'],
+            topics: { math: ['fractions'], reading: ['comprehension'] },
+            // E minor synth arpeggios: E4, G4, B4, E5, cycling fast
+            melody: [
+                329.63, S.G4, 493.88, 659.25, 493.88, S.G4, 329.63, 0,
+                329.63, S.A4, 493.88, 659.25, 493.88, S.A4, 329.63, 0,
+                329.63, S.G4, 493.88, 659.25, S.A5, 659.25, 493.88, S.G4,
+                329.63, S.G4, 493.88, 659.25, 493.88, S.G4, 0, 0
+            ],
+            // Pulsing E bass
+            bass: [164.81, 0, 164.81, 0, 164.81, 0, 196, 0,
+                   164.81, 0, 164.81, 0, 220, 0, 196, 0],
+            noteChart: [
+                { beat: 2,  type: 'identify', topic: 'reading:comprehension' },
+                { beat: 4,  type: 'identify', topic: 'math:fractions' },
+                { beat: 6,  type: 'identify', topic: 'reading:comprehension' },
+                { beat: 8,  type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 12, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 14, type: 'identify', topic: 'math:fractions' },
+                { beat: 16, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 18, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 22, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 24, type: 'identify', topic: 'math:fractions' },
+                { beat: 26, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 28, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 32, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 34, type: 'identify', topic: 'math:fractions' },
+                { beat: 36, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 38, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 42, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 44, type: 'identify', topic: 'math:fractions' },
+                { beat: 46, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 48, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 52, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 54, type: 'identify', topic: 'math:fractions' },
+                { beat: 56, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 60, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 62, type: 'identify', topic: 'math:fractions' },
+                { beat: 64, type: 'identify', topic: 'reading:comprehension' }
+            ]
+        }
     ];
 
     function getSong(id) {
