@@ -173,6 +173,31 @@ const Main = (() => {
             const level = OTBEcosystem.getLevelInfo();
             if (profile.playerName) nameEl.textContent = profile.playerName;
             levelEl.textContent = `Lv. ${level.level}`;
+
+            // Streak badge
+            const streakEl = document.getElementById('title-streak-badge');
+            if (streakEl && profile.dailyStreak > 0) {
+                streakEl.textContent = '\uD83D\uDD25 ' + profile.dailyStreak + ' day streak!';
+                streakEl.style.display = '';
+            }
+        }
+
+        // Stars badge
+        const starsEl = document.getElementById('title-stars-badge');
+        if (starsEl) {
+            const totalStars = Progress.getTotalStars();
+            starsEl.textContent = '\u2B50 ' + totalStars + ' Stars';
+        }
+
+        // Achievement count
+        const achEl = document.getElementById('title-achievement-count');
+        if (achEl && typeof Achievements !== 'undefined') {
+            const count = Achievements.getEarnedCount();
+            const total = Achievements.definitions.length;
+            if (count > 0) {
+                achEl.textContent = '\uD83C\uDFC6 ' + count + '/' + total;
+                achEl.style.display = '';
+            }
         }
     }
 
@@ -308,6 +333,21 @@ const Main = (() => {
 
         // Save progress
         Progress.recordSongResult(result.songId, result);
+
+        // Check achievements
+        if (typeof Achievements !== 'undefined') {
+            const newAch = Achievements.checkAfterSong(result);
+            if (newAch.length > 0) {
+                // Show achievement toast
+                newAch.forEach(ach => {
+                    const toast = document.createElement('div');
+                    toast.className = 'achievement-toast';
+                    toast.textContent = `${ach.icon} ${ach.name}`;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 3000);
+                });
+            }
+        }
     }
 
     function _pauseGame() {
