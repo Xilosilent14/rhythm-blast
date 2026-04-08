@@ -39,12 +39,8 @@ const NoteGenerator = (() => {
             question = MathData.generate('counting', 0);
         }
 
-        if (entry.type === 'identify') {
-            return _makeIdentifyNotes(question, entry.beat, domain);
-        } else if (entry.type === 'sequence') {
-            return _makeSequenceNotes(question, entry.beat, entry.length || 3, domain);
-        }
-
+        // All patterns use identify (3 simultaneous notes, tap the correct one).
+        // Sequence pattern removed — gray lead-in notes confused young players.
         return _makeIdentifyNotes(question, entry.beat, domain);
     }
 
