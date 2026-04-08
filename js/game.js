@@ -24,18 +24,18 @@ const Game = (() => {
     let fallDuration = 6.0; // seconds, set per song in startSong()
     const SPAWN_Y = -60; // Above screen
 
-    // Timing windows (ms) per difficulty — Easy is very forgiving for young kids
+    // Timing windows (ms) per difficulty — Easy is extremely forgiving for young kids
     const DIFFICULTY_WINDOWS = {
-        easy:   { PERFECT: 500, GREAT: 800, OK: 1200 },
-        normal: { PERFECT: 200, GREAT: 400, OK: 600 },
-        hard:   { PERFECT: 100, GREAT: 220, OK: 350 }
+        easy:   { PERFECT: 600, GREAT: 1000, OK: 1500 },
+        normal: { PERFECT: 250, GREAT: 500, OK: 750 },
+        hard:   { PERFECT: 120, GREAT: 250, OK: 400 }
     };
 
     // Fall duration (seconds) per difficulty — how long a note takes to travel from spawn to hit zone
     const DIFFICULTY_FALL_DURATION = {
-        easy:   8.0,   // 8 seconds — very slow for ages 3-5
-        normal: 5.5,   // 5.5 seconds — comfortable for ages 6-8
-        hard:   3.5    // 3.5 seconds — challenging
+        easy:   10.0,  // 10 seconds — very slow crawl for ages 3-5
+        normal: 6.5,   // 6.5 seconds — comfortable for ages 6-8
+        hard:   4.0    // 4 seconds — challenging
     };
 
     function _getWindows() {
@@ -722,6 +722,13 @@ const Game = (() => {
 
         if (closestNote.isCorrect) {
             closestNote.hit = true;
+            // Auto-dismiss all other notes in the same beat group (wrong answers)
+            activeNotes.forEach(n => {
+                if (n.hitBeat === closestNote.hitBeat && n.type === 'identify' && !n.isCorrect) {
+                    n.hit = true; // Remove them so they don't fall through as misses
+                    n.alpha = 0.3; // Fade them out visually
+                }
+            });
             let points = 0;
             let label = '';
             let color = '';
