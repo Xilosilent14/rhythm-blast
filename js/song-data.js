@@ -409,6 +409,188 @@ const SongData = (() => {
                 { beat: 84, type: 'identify', topic: 'reading:comprehension' },
                 { beat: 88, type: 'identify', topic: 'math:fractions' }
             ]
+        },
+        // --- EXPANSION SONGS ---
+        {
+            id: 'ninja-dash',
+            name: 'Ninja Dash',
+            album: 'power-tracks',
+            bpm: 135,
+            difficulty: 3,
+            starsRequired: 24,
+            emoji: '🥷',
+            bannerClass: 'banner-hyrule',
+            themes: ['ninja', 'stealth'],
+            topics: { math: ['division', 'multiplication'], reading: ['context-clues'] },
+            melody: [
+                S.E4, S.G4, S.A4, 0, S.C5, S.D5, S.C5, S.A4,
+                S.G4, S.A4, S.C5, S.D5, S.E5, S.D5, 0, S.A4,
+                S.E4, S.G4, S.C5, S.E5
+            ],
+            bass: [164.81, 0, 196, 0, 220, 0, 196, 0,
+                   164.81, 0, 196, 0, 220, 0, 164.81, 0],
+            noteChart: [
+                { beat: 4,  type: 'identify', topic: 'math:division' },
+                { beat: 8,  type: 'identify', topic: 'reading:context-clues' },
+                { beat: 12, type: 'sequence', topic: 'math:multiplication', length: 3 },
+                { beat: 20, type: 'identify', topic: 'reading:context-clues' },
+                { beat: 24, type: 'identify', topic: 'math:division' },
+                { beat: 28, type: 'identify', topic: 'reading:context-clues' },
+                { beat: 32, type: 'sequence', topic: 'math:division', length: 3 },
+                { beat: 40, type: 'identify', topic: 'reading:context-clues' },
+                { beat: 44, type: 'identify', topic: 'math:multiplication' },
+                { beat: 48, type: 'identify', topic: 'reading:context-clues' },
+                { beat: 52, type: 'sequence', topic: 'math:division', length: 3 },
+                { beat: 60, type: 'identify', topic: 'reading:context-clues' },
+                { beat: 64, type: 'identify', topic: 'math:multiplication' },
+                { beat: 68, type: 'sequence', topic: 'math:division', length: 3 },
+                { beat: 76, type: 'identify', topic: 'reading:context-clues' },
+                { beat: 80, type: 'identify', topic: 'math:division' }
+            ]
+        },
+        {
+            id: 'candy-rush',
+            name: 'Candy Rush',
+            album: 'power-tracks',
+            bpm: 110,
+            difficulty: 2,
+            starsRequired: 12,
+            emoji: '🍬',
+            bannerClass: 'banner-stadium',
+            themes: ['candy', 'sweet'],
+            topics: { math: ['addition', 'subtraction'], reading: ['sight-words', 'phonics'] },
+            melody: [
+                S.C5, S.D5, S.E5, S.G5, S.E5, S.D5, S.C5, 0,
+                S.D5, S.E5, S.G5, S.A5, S.G5, S.E5, S.D5, S.C5
+            ],
+            bass: [S.C4/2, S.E4/2, S.G4/2, S.C4/2, S.A4/2, S.G4/2, S.E4/2, S.C4/2],
+            noteChart: [
+                { beat: 4,  type: 'identify', topic: 'reading:sight-words' },
+                { beat: 8,  type: 'identify', topic: 'math:addition' },
+                { beat: 12, type: 'identify', topic: 'reading:phonics' },
+                { beat: 16, type: 'sequence', topic: 'math:addition', length: 3 },
+                { beat: 22, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 26, type: 'identify', topic: 'math:subtraction' },
+                { beat: 30, type: 'identify', topic: 'reading:phonics' },
+                { beat: 34, type: 'sequence', topic: 'math:subtraction', length: 3 },
+                { beat: 40, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 44, type: 'identify', topic: 'math:addition' },
+                { beat: 48, type: 'sequence', topic: 'math:subtraction', length: 3 },
+                { beat: 54, type: 'identify', topic: 'reading:phonics' },
+                { beat: 58, type: 'identify', topic: 'math:addition' },
+                { beat: 62, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 66, type: 'sequence', topic: 'math:addition', length: 3 },
+                { beat: 72, type: 'identify', topic: 'reading:phonics' },
+                { beat: 76, type: 'identify', topic: 'math:subtraction' }
+            ]
+        },
+        {
+            id: 'volcano-run',
+            name: 'Volcano Run',
+            album: 'power-tracks',
+            bpm: 140,
+            difficulty: 3,
+            starsRequired: 28,
+            emoji: '🌋',
+            bannerClass: 'banner-highway',
+            themes: ['volcano', 'danger'],
+            topics: { math: ['place-value', 'rounding'], reading: ['main-idea'] },
+            melody: [
+                S.A4, S.C5, S.D5, S.E5, S.D5, S.C5, S.A4, 0,
+                S.C5, S.D5, S.E5, S.G5, S.E5, S.D5, S.C5, S.A4,
+                S.A4, S.C5, S.E5, S.G5
+            ],
+            bass: [220, 0, 220, 0, 174.61, 0, 220, 0,
+                   220, 0, 220, 0, 174.61, 0, 220, 0],
+            noteChart: [
+                { beat: 4,  type: 'identify', topic: 'math:place-value' },
+                { beat: 8,  type: 'identify', topic: 'reading:main-idea' },
+                { beat: 12, type: 'sequence', topic: 'math:rounding', length: 3 },
+                { beat: 20, type: 'identify', topic: 'reading:main-idea' },
+                { beat: 24, type: 'identify', topic: 'math:place-value' },
+                { beat: 28, type: 'identify', topic: 'reading:main-idea' },
+                { beat: 32, type: 'sequence', topic: 'math:place-value', length: 3 },
+                { beat: 40, type: 'identify', topic: 'reading:main-idea' },
+                { beat: 44, type: 'identify', topic: 'math:rounding' },
+                { beat: 48, type: 'sequence', topic: 'math:place-value', length: 3 },
+                { beat: 56, type: 'identify', topic: 'reading:main-idea' },
+                { beat: 60, type: 'identify', topic: 'math:rounding' },
+                { beat: 64, type: 'identify', topic: 'reading:main-idea' },
+                { beat: 68, type: 'sequence', topic: 'math:rounding', length: 3 },
+                { beat: 76, type: 'identify', topic: 'math:place-value' },
+                { beat: 80, type: 'identify', topic: 'reading:main-idea' }
+            ]
+        },
+        {
+            id: 'rainbow-ride',
+            name: 'Rainbow Ride',
+            album: 'power-tracks',
+            bpm: 100,
+            difficulty: 1,
+            starsRequired: 2,
+            emoji: '🌈',
+            bannerClass: 'banner-stadium',
+            themes: ['rainbow', 'happy'],
+            topics: { math: ['counting', 'shapes'], reading: ['letters', 'beginning-sounds'] },
+            melody: [
+                S.C4, S.D4, S.E4, S.G4, S.A4, S.G4, S.E4, S.D4,
+                S.C4, S.E4, S.G4, S.A4
+            ],
+            bass: [S.C4/2, S.C4/2, S.G4/2, S.G4/2, S.A4/2, S.A4/2, S.G4/2, S.G4/2],
+            noteChart: [
+                { beat: 6,   type: 'identify', topic: 'reading:letters' },
+                { beat: 12,  type: 'identify', topic: 'math:counting' },
+                { beat: 18,  type: 'identify', topic: 'reading:beginning-sounds' },
+                { beat: 24,  type: 'sequence', topic: 'math:counting', length: 3 },
+                { beat: 32,  type: 'identify', topic: 'reading:letters' },
+                { beat: 38,  type: 'identify', topic: 'math:shapes' },
+                { beat: 44,  type: 'identify', topic: 'reading:beginning-sounds' },
+                { beat: 50,  type: 'sequence', topic: 'math:shapes', length: 3 },
+                { beat: 58,  type: 'identify', topic: 'reading:letters' },
+                { beat: 64,  type: 'identify', topic: 'math:counting' },
+                { beat: 70,  type: 'identify', topic: 'reading:beginning-sounds' },
+                { beat: 76,  type: 'identify', topic: 'math:shapes' }
+            ]
+        },
+        {
+            id: 'thunder-bolt',
+            name: 'Thunder Bolt',
+            album: 'power-tracks',
+            bpm: 145,
+            difficulty: 3,
+            starsRequired: 32,
+            emoji: '⚡',
+            bannerClass: 'banner-hyrule',
+            themes: ['storm', 'electric'],
+            topics: { math: ['fractions', 'word-problems'], reading: ['vocabulary', 'comprehension'] },
+            melody: [
+                S.E4, S.G4, S.A4, S.C5, S.E5, S.D5, S.C5, 0,
+                S.A4, S.C5, S.D5, S.E5, S.G5, S.E5, S.D5, S.C5,
+                S.A4, S.G4, S.A4, S.C5, S.E5, S.G5, S.E5, 0,
+                S.C5, S.A4, S.G4, S.A4, S.C5, S.E5, 0, 0
+            ],
+            bass: [164.81, 0, 220, 0, 164.81, 0, 220, 0,
+                   164.81, 0, 220, 0, 196, 0, 164.81, 0],
+            noteChart: [
+                { beat: 4,  type: 'identify', topic: 'math:fractions' },
+                { beat: 8,  type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 12, type: 'sequence', topic: 'math:word-problems', length: 3 },
+                { beat: 20, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 24, type: 'identify', topic: 'math:fractions' },
+                { beat: 28, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 32, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 40, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 44, type: 'identify', topic: 'math:word-problems' },
+                { beat: 48, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 52, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 60, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 64, type: 'identify', topic: 'math:word-problems' },
+                { beat: 68, type: 'sequence', topic: 'math:fractions', length: 3 },
+                { beat: 76, type: 'identify', topic: 'reading:vocabulary' },
+                { beat: 80, type: 'identify', topic: 'math:fractions' },
+                { beat: 84, type: 'identify', topic: 'reading:comprehension' },
+                { beat: 88, type: 'sequence', topic: 'math:word-problems', length: 3 }
+            ]
         }
     ];
 

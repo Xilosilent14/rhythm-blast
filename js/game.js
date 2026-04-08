@@ -727,9 +727,11 @@ const Game = (() => {
             points = Math.round(points * multiplier);
             score += points;
 
-            if (combo === 5 || combo === 10 || combo === 20) {
+            if (combo === 5 || combo === 10 || combo === 20 || combo === 25 || combo === 50) {
                 Audio.comboMilestone();
-                screenShake = 4;
+                screenShake = combo >= 25 ? 8 : 4;
+                // Big visual burst at 25x and 50x
+                if (combo >= 25) _spawnComboParticles(combo);
             }
 
             _showFeedback(label + (combo >= 5 ? ` ${combo}x` : ''), color);
@@ -894,6 +896,30 @@ const Game = (() => {
 
     function getScore() { return score; }
     function getCombo() { return combo; }
+
+    function _spawnComboParticles(count) {
+        const canvas = document.getElementById('game-canvas');
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const colors = ['#ffd700', '#ff6b6b', '#a855f7', '#4ecdc4', '#ff9f43'];
+        const particleCount = count >= 50 ? 30 : 15;
+        for (let i = 0; i < particleCount; i++) {
+            const el = document.createElement('div');
+            el.style.cssText = `position:fixed;width:8px;height:8px;border-radius:50%;pointer-events:none;z-index:9999;background:${colors[i % colors.length]};left:${rect.left + cx}px;top:${rect.top + cy}px;`;
+            document.body.appendChild(el);
+            const angle = (Math.PI * 2 * i) / particleCount;
+            const dist = 60 + Math.random() * 80;
+            const dx = Math.cos(angle) * dist;
+            const dy = Math.sin(angle) * dist;
+            el.animate([
+                { transform: 'translate(0,0) scale(1)', opacity: 1 },
+                { transform: `translate(${dx}px,${dy}px) scale(0)`, opacity: 0 }
+            ], { duration: 800, easing: 'ease-out' });
+            setTimeout(() => el.remove(), 800);
+        }
+    }
 
     return {
         init, startSong, stop, pause, resume,

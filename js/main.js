@@ -70,6 +70,8 @@ const Main = (() => {
             Audio.unlock();
             showScreen('songs');
         });
+        document.getElementById('btn-achievements').addEventListener('click', () => showScreen('achievements'));
+        document.getElementById('btn-achievements-back').addEventListener('click', () => showScreen('title'));
         document.getElementById('btn-settings').addEventListener('click', () => showScreen('settings'));
         document.getElementById('btn-parent').addEventListener('click', () => showScreen('parent'));
         document.getElementById('btn-songs-back').addEventListener('click', () => showScreen('title'));
@@ -161,6 +163,7 @@ const Main = (() => {
 
         // Screen-specific setup
         if (name === 'songs') _buildSongGrid();
+        if (name === 'achievements') _buildAchievementsScreen();
         if (name === 'title') { _updatePlayerInfo(); _startTitleAnim(); }
         else { _stopTitleAnim(); }
     }
@@ -410,6 +413,27 @@ const Main = (() => {
                 <div class="otb-stat-row"><span class="otb-stat-label">Daily Streak</span><span class="otb-stat-value gold">${summary.dailyStreak} days</span></div>
                 <div class="otb-stat-row"><span class="otb-stat-label">Cross-Game Answers</span><span class="otb-stat-value gold">${summary.totalAnswers}</span></div>
             ` : ''}
+        `;
+    }
+
+    function _buildAchievementsScreen() {
+        const grid = document.getElementById('achievements-grid');
+        if (!grid) return;
+        const all = Achievements.getAll();
+        const earned = all.filter(a => a.earned).length;
+        grid.innerHTML = `
+            <div class="achievements-header">
+                <span class="achievements-count">${earned} / ${all.length} Earned</span>
+            </div>
+            <div class="achievements-cards">
+                ${all.map(a => `
+                    <div class="achievement-card ${a.earned ? 'earned' : 'locked'}">
+                        <div class="achievement-icon">${a.earned ? a.icon : '🔒'}</div>
+                        <div class="achievement-name">${a.earned ? a.name : '???'}</div>
+                        <div class="achievement-desc">${a.desc}</div>
+                    </div>
+                `).join('')}
+            </div>
         `;
     }
 
