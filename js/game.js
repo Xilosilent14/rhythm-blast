@@ -25,16 +25,16 @@ const Game = (() => {
 
     // Timing windows (ms) per difficulty — Easy is very forgiving for young kids
     const DIFFICULTY_WINDOWS = {
-        easy:   { PERFECT: 300, GREAT: 500, OK: 700 },
-        normal: { PERFECT: 150, GREAT: 300, OK: 450 },
-        hard:   { PERFECT: 80,  GREAT: 180, OK: 300 }
+        easy:   { PERFECT: 500, GREAT: 800, OK: 1200 },
+        normal: { PERFECT: 200, GREAT: 400, OK: 600 },
+        hard:   { PERFECT: 100, GREAT: 220, OK: 350 }
     };
 
     // Fall duration (seconds) per difficulty — how long a note takes to travel from spawn to hit zone
     const DIFFICULTY_FALL_DURATION = {
-        easy:   6.0,   // 6 seconds — plenty of time to read and react
-        normal: 4.0,   // 4 seconds — comfortable
-        hard:   2.5    // 2.5 seconds — challenging
+        easy:   8.0,   // 8 seconds — very slow for ages 3-5
+        normal: 5.5,   // 5.5 seconds — comfortable for ages 6-8
+        hard:   3.5    // 3.5 seconds — challenging
     };
 
     function _getWindows() {
@@ -153,7 +153,14 @@ const Game = (() => {
         const level = Progress.getLevel ? Progress.getLevel() : 0;
         const fallDurationMs = fallDuration * 1000;
         song.noteChart.forEach(entry => {
-            const { notes, ttsText } = NoteGenerator.fromChartEntry(entry, level);
+            const generated = NoteGenerator.fromChartEntry(entry, level);
+            const notes = generated.notes;
+            const ttsText = generated.ttsText;
+            const questionText = generated.question || '';
+
+            // Store question text on each note group for the visual prompt
+            notes.forEach(n => { n._questionText = questionText; });
+
             notes.forEach(n => {
                 noteQueue.push({
                     ...n,
@@ -204,9 +211,39 @@ const Game = (() => {
                 } else {
                     n.y = SPAWN_Y;
                     activeNotes.push(n);
+                    // Show question prompt and lane labels when identify notes spawn
+                    if (n.type === 'identify' && n._questionText) {
+                        _showQuestionPrompt(n._questionText);
+                        _showLaneLabels(activeNotes.filter(an => an.hitBeat === n.hitBeat && an.type === 'identify'));
+                    }
                 }
             }
         });
+    }
+
+    function _showQuestionPrompt(text) {
+        const el = document.getElementById('question-prompt');
+        if (!el) return;
+        el.textContent = text;
+        el.style.display = 'block';
+        // Auto-hide after the note passes
+        clearTimeout(el._hideTimer);
+        el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, fallDuration * 1000 + 1000);
+    }
+
+    function _showLaneLabels(identifyNotes) {
+        const container = document.getElementById('lane-labels');
+        if (!container || identifyNotes.length === 0) return;
+        container.style.display = 'flex';
+        for (let i = 0; i < 3; i++) {
+            const label = document.getElementById('lane-label-' + i);
+            if (!label) continue;
+            const note = identifyNotes.find(n => n.lane === i);
+            label.textContent = note ? note.text : '';
+        }
+        // Auto-hide when notes pass
+        clearTimeout(container._hideTimer);
+        container._hideTimer = setTimeout(() => { container.style.display = 'none'; }, fallDuration * 1000 + 1000);
     }
 
     function stop() {
@@ -216,6 +253,11 @@ const Game = (() => {
             animId = null;
         }
         Audio.stopSong();
+        // Hide overlays
+        const prompt = document.getElementById('question-prompt');
+        if (prompt) prompt.style.display = 'none';
+        const labels = document.getElementById('lane-labels');
+        if (labels) labels.style.display = 'none';
     }
 
     function pause() {
@@ -494,16 +536,12 @@ const Game = (() => {
         const y = note.y;
         const color = LANE_COLORS[note.lane];
         const isLead = note.type === 'sequence-lead';
-        const baseRadius = isLead ? 26 : 42;
-
-        // Breathing pulse: subtle size oscillation as notes fall
-        const breathe = Math.sin(Date.now() / 200 + (note.hitBeat || 0) * 1.5) * 3;
-        const radius = baseRadius + (isLead ? 0 : breathe);
+        const radius = isLead ? 26 : 44;
 
         ctx.globalAlpha = note.alpha;
 
-        // Trailing particles behind note as it falls
-        if (!note.hit && !note.missed && !isLead && Math.random() < 0.3) {
+        // Subtle trailing particles (reduced frequency)
+        if (!note.hit && !note.missed && !isLead && Math.random() < 0.15) {
             particles.push({
                 x: x + (Math.random() - 0.5) * 10,
                 y: y + radius,
@@ -515,20 +553,19 @@ const Game = (() => {
             });
         }
 
-        // Outer glow ring (breathing, larger aura)
+        // Static gentle glow ring (no pulsing)
         if (!isLead && !note.hit && !note.missed) {
-            const glowPulse = 0.08 + Math.sin(Date.now() / 250 + (note.hitBeat || 0)) * 0.05;
             ctx.fillStyle = color;
-            ctx.globalAlpha = note.alpha * glowPulse;
+            ctx.globalAlpha = note.alpha * 0.08;
             ctx.beginPath();
-            ctx.arc(x, y, radius + 8 + breathe * 0.5, 0, Math.PI * 2);
+            ctx.arc(x, y, radius + 8, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = note.alpha;
         }
 
-        // Note glow
+        // Note glow (static, no breathing)
         ctx.shadowColor = color;
-        ctx.shadowBlur = 15 + beatPulse * 8 + breathe;
+        ctx.shadowBlur = 16;
 
         // Note body
         ctx.fillStyle = isLead ? 'rgba(255,255,255,0.15)' : color;
@@ -546,19 +583,18 @@ const Game = (() => {
 
         // High-contrast dark background behind text for readability
         if (!isLead) {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
             ctx.beginPath();
             ctx.arc(x, y, radius - 6, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Text on note — large and bold for kids to read
+        // Text on note — constant large size, no flickering
         ctx.fillStyle = isLead ? 'rgba(255,255,255,0.6)' : '#fff';
-        const fontSize = isLead ? 16 : (note.text.length > 4 ? 22 : 28);
-        ctx.font = `bold ${fontSize}px 'Fredoka One', sans-serif`;
+        ctx.font = `bold ${isLead ? 16 : 24}px 'Fredoka One', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const displayText = note.text.length > 6 ? note.text.substring(0, 6) : note.text;
+        const displayText = note.text.length > 8 ? note.text.substring(0, 8) : note.text;
         ctx.fillText(displayText, x, y);
 
         // Hit feedback glow on correct hit
