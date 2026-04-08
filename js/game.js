@@ -21,6 +21,7 @@ const Game = (() => {
     let activeNotes = []; // Currently visible on screen
     let noteQueue = []; // Generated but not yet spawned
     let noteSpeed = 0; // pixels per frame
+    let fallDuration = 6.0; // seconds, set per song in startSong()
     const SPAWN_Y = -60; // Above screen
 
     // Timing windows (ms) per difficulty — Easy is very forgiving for young kids
@@ -122,7 +123,7 @@ const Game = (() => {
         // Easy = 6s fall time (very slow, kids can read and react)
         // Normal = 4s, Hard = 2.5s
         const diff = (Progress.getSettings && Progress.getSettings().difficulty) || 'normal';
-        const fallDuration = DIFFICULTY_FALL_DURATION[diff] || DIFFICULTY_FALL_DURATION.normal;
+        fallDuration = DIFFICULTY_FALL_DURATION[diff] || DIFFICULTY_FALL_DURATION.normal;
         const fallDistance = hitZoneY - SPAWN_Y;
         const fallFrames = (fallDuration * 1000 / (1000 / 60)); // convert seconds to frames at 60fps
         noteSpeed = fallDistance / fallFrames;
@@ -301,6 +302,7 @@ const Game = (() => {
                 n.missed = true;
                 if (n.type === 'sequence-lead') return; // lead notes auto-pass
                 if (n.type === 'sequence-answer' && !n.isCorrect) return; // wrong answer in sequence, don't count
+                if (n.type === 'identify' && !n.isCorrect) return; // wrong answer in identify, don't count as miss
                 misses++;
 
                 if (diff === 'easy') {
