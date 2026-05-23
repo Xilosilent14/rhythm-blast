@@ -591,6 +591,83 @@ const SongData = (() => {
                 { beat: 84, type: 'identify', topic: 'reading:comprehension' },
                 { beat: 88, type: 'sequence', topic: 'math:word-problems', length: 3 }
             ]
+        },
+        // --- GENRE EXPANSION (May 2026): classical 3/4 waltz + jazz swing ---
+        {
+            id: 'royal-waltz',
+            name: 'Royal Waltz',
+            album: 'classical',
+            bpm: 96,
+            difficulty: 1,
+            starsRequired: 5,
+            emoji: '👑',
+            bannerClass: 'banner-stadium',
+            themes: ['classical', 'waltz'],
+            topics: { math: ['counting', 'patterns'], reading: ['letters', 'sight-words'] },
+            // 3/4 time feel — A minor classical, gentle and waltzy
+            melody: [
+                S.A4, S.C5, S.E5, S.C5, S.A4, 0,
+                S.G4, S.A4, S.C5, S.A4, S.G4, 0,
+                S.E4, S.G4, S.A4, S.G4, S.E4, 0,
+                S.A4, S.C5, S.E5, S.D5, S.C5, 0
+            ],
+            // Slow walking bass for 3/4 feel (root on 1, lighter on 2/3)
+            bass: [110, 0, 0, 130.81, 0, 0, 174.61, 0, 0, 110, 0, 0],
+            noteChart: [
+                { beat: 6,  type: 'identify', topic: 'reading:letters' },
+                { beat: 12, type: 'identify', topic: 'math:counting' },
+                { beat: 18, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 24, type: 'sequence', topic: 'math:patterns', length: 3 },
+                { beat: 32, type: 'identify', topic: 'reading:letters' },
+                { beat: 38, type: 'identify', topic: 'math:counting' },
+                { beat: 44, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 50, type: 'sequence', topic: 'math:patterns', length: 3 },
+                { beat: 58, type: 'identify', topic: 'reading:letters' },
+                { beat: 64, type: 'identify', topic: 'math:counting' },
+                { beat: 70, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 76, type: 'identify', topic: 'math:patterns' }
+            ]
+        },
+        {
+            id: 'midnight-jazz',
+            name: 'Midnight Jazz',
+            album: 'jazz-lounge',
+            bpm: 108,
+            difficulty: 2,
+            starsRequired: 11,
+            emoji: '🎷',
+            bannerClass: 'banner-stadium',
+            themes: ['jazz', 'swing'],
+            topics: { math: ['addition', 'patterns'], reading: ['sight-words', 'rhyming'] },
+            // Bluesy F major-7 vibe with chromatic passing tones
+            melody: [
+                349.23, S.A4, S.C5, 622.25, S.C5, S.A4, 349.23, 0,
+                S.G4, S.A4, S.C5, S.D5, S.C5, S.A4, S.G4, 0,
+                349.23, S.A4, S.C5, S.E5, S.D5, S.C5, S.A4, 0,
+                S.G4, 349.23, S.A4, S.C5, S.D5, S.C5, 0, 0
+            ],
+            // Walking bass — F, A, C, D, F (classic ii-V feel reduced)
+            bass: [87.31, 110, 130.81, 146.83, 87.31, 110, 130.81, 146.83,
+                   87.31, 110, 130.81, 146.83, 87.31, 110, 130.81, 146.83],
+            noteChart: [
+                { beat: 4,  type: 'identify', topic: 'reading:rhyming' },
+                { beat: 8,  type: 'identify', topic: 'math:addition' },
+                { beat: 12, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 16, type: 'sequence', topic: 'math:addition', length: 3 },
+                { beat: 22, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 26, type: 'identify', topic: 'math:patterns' },
+                { beat: 30, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 34, type: 'sequence', topic: 'math:patterns', length: 3 },
+                { beat: 40, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 44, type: 'identify', topic: 'math:addition' },
+                { beat: 48, type: 'sequence', topic: 'math:patterns', length: 3 },
+                { beat: 54, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 58, type: 'identify', topic: 'math:addition' },
+                { beat: 62, type: 'identify', topic: 'reading:rhyming' },
+                { beat: 66, type: 'identify', topic: 'math:patterns' },
+                { beat: 70, type: 'identify', topic: 'reading:sight-words' },
+                { beat: 74, type: 'identify', topic: 'math:addition' }
+            ]
         }
     ];
 

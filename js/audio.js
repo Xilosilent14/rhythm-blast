@@ -1,16 +1,28 @@
 /* ============================================
    RHYTHM BLAST — Audio Engine
    Web Audio API synthesized music + SFX + beat scheduling
-   Following OTB audio patterns from ThinkFast
+   Architecture (May 2026 deep audit):
+     drum-bus + melody-bus + pad-bus -> music-bus -> reverb send + dry -> master compressor
+     sfx-bus -> master compressor
+     voice-bus -> master compressor (with sidechain-style ducking of music-bus during TTS)
+     master compressor -> limiter (-1 dBFS) -> destination
    ============================================ */
 const Audio = (() => {
     let ctx = null;
     let masterGain = null;
     let compressor = null;
-    let musicGain = null;
+    let limiter = null;
+    let musicBus = null;      // sums drum/melody/pad/bass
+    let drumBus = null;
+    let melodyBus = null;
+    let bassBus = null;
+    let padBus = null;
     let sfxGain = null;
+    let voiceGain = null;     // routes TTS-aware SFX (e.g., spoken confirmations)
     let reverbGain = null;
     let reverbDry = null;
+    // Legacy aliases (kept so external callers using musicGain/padGain still work).
+    let musicGain = null;
     let padGain = null;
     let unlocked = false;
     let settings = { sfx: true, music: true, voice: true };
@@ -20,8 +32,16 @@ const Audio = (() => {
     const MASTER_VOL = 0.7;
     const MUSIC_VOL = 0.2;
     const SFX_VOL = 0.5;
+    const VOICE_VOL = 0.85;
     const REVERB_WET = 0.15;
     const PAD_VOL = 0.08;
+    // Per-bus mix levels (relative within music bus)
+    const DRUM_BUS_VOL = 1.0;
+    const MELODY_BUS_VOL = 0.9;
+    const BASS_BUS_VOL = 1.0;
+    // Ducking target (fraction of MUSIC_VOL) while voice is speaking
+    const DUCK_LEVEL = 0.5;
+    const DUCK_FADE = 0.25; // seconds
 
     function _getCtx() {
         if (!ctx) {
@@ -31,42 +51,104 @@ const Audio = (() => {
                 return null; // SES or browser restriction — audio degrades gracefully
             }
 
-            // Master compressor for even volume
+            // === MASTER CHAIN: source-buses -> compressor -> limiter -> destination ===
+
+            // Brick-wall limiter at -1 dBFS to protect tablet speakers
+            limiter = ctx.createDynamicsCompressor();
+            limiter.threshold.value = -1;
+            limiter.knee.value = 0;
+            limiter.ratio.value = 20;       // near brick-wall
+            limiter.attack.value = 0.001;
+            limiter.release.value = 0.05;
+            limiter.connect(ctx.destination);
+
+            // Glue compressor (program material)
             compressor = ctx.createDynamicsCompressor();
-            compressor.threshold.value = -24;
+            compressor.threshold.value = -18;
             compressor.knee.value = 12;
-            compressor.ratio.value = 4;
-            compressor.attack.value = 0.003;
-            compressor.release.value = 0.15;
-            compressor.connect(ctx.destination);
+            compressor.ratio.value = 3;
+            compressor.attack.value = 0.005;
+            compressor.release.value = 0.18;
+            compressor.connect(limiter);
 
             masterGain = ctx.createGain();
             masterGain.gain.value = MASTER_VOL;
             masterGain.connect(compressor);
 
-            // Reverb send (feedback delay network)
+            // Reverb send (feedback delay network) — fed by melodyBus only for warmth
             reverbGain = ctx.createGain();
             reverbGain.gain.value = REVERB_WET;
             reverbDry = ctx.createGain();
             reverbDry.gain.value = 1.0;
             _setupReverb();
 
-            musicGain = ctx.createGain();
-            musicGain.gain.value = MUSIC_VOL;
-            musicGain.connect(reverbDry);
-            musicGain.connect(reverbGain);
+            // === MUSIC BUS (sums all musical sources) ===
+            musicBus = ctx.createGain();
+            musicBus.gain.value = MUSIC_VOL;
+            musicBus.connect(reverbDry);
 
-            // Pad layer gain
-            padGain = ctx.createGain();
-            padGain.gain.value = PAD_VOL;
-            padGain.connect(reverbDry);
-            padGain.connect(reverbGain);
+            // Per-track music sub-buses
+            drumBus = ctx.createGain();
+            drumBus.gain.value = DRUM_BUS_VOL;
+            drumBus.connect(musicBus);
 
+            melodyBus = ctx.createGain();
+            melodyBus.gain.value = MELODY_BUS_VOL;
+            melodyBus.connect(musicBus);
+            melodyBus.connect(reverbGain); // reverb send on melody for warmth
+
+            bassBus = ctx.createGain();
+            bassBus.gain.value = BASS_BUS_VOL;
+            bassBus.connect(musicBus);
+
+            padBus = ctx.createGain();
+            padBus.gain.value = PAD_VOL;
+            padBus.connect(musicBus);
+            padBus.connect(reverbGain);
+
+            // SFX bus — bypasses ducking but still goes through master compressor/limiter
             sfxGain = ctx.createGain();
             sfxGain.gain.value = SFX_VOL;
             sfxGain.connect(masterGain);
+
+            // Voice bus (for Web Audio voice playback like CloudTTS buffers).
+            // Web Speech API is OS-level and can't be routed here, but ducking still applies.
+            voiceGain = ctx.createGain();
+            voiceGain.gain.value = VOICE_VOL;
+            voiceGain.connect(masterGain);
+
+            // Legacy aliases for back-compat with callers expecting musicGain / padGain
+            musicGain = musicBus;
+            padGain = padBus;
         }
         return ctx;
+    }
+
+    // Sidechain-style ducking: music bus drops to DUCK_LEVEL * MUSIC_VOL during voice.
+    // Use smooth linear ramps (setTargetAtTime causes long tails on Silk).
+    let _duckRefCount = 0;
+    function _duckStart() {
+        const c = _getCtx();
+        if (!c || !musicBus) return;
+        _duckRefCount++;
+        try {
+            const now = c.currentTime;
+            musicBus.gain.cancelScheduledValues(now);
+            musicBus.gain.setValueAtTime(musicBus.gain.value, now);
+            musicBus.gain.linearRampToValueAtTime(MUSIC_VOL * DUCK_LEVEL, now + DUCK_FADE);
+        } catch (e) {}
+    }
+    function _duckEnd() {
+        const c = _getCtx();
+        if (!c || !musicBus) return;
+        _duckRefCount = Math.max(0, _duckRefCount - 1);
+        if (_duckRefCount > 0) return; // still ducking for another voice line
+        try {
+            const now = c.currentTime;
+            musicBus.gain.cancelScheduledValues(now);
+            musicBus.gain.setValueAtTime(musicBus.gain.value, now);
+            musicBus.gain.linearRampToValueAtTime(MUSIC_VOL, now + DUCK_FADE);
+        } catch (e) {}
     }
 
     // Delay-based reverb (feedback delay with filtering)
@@ -361,23 +443,23 @@ const Audio = (() => {
                 const beatTime = songStartTime + bi * beatDuration;
 
                 if (settings.music) {
-                    // Melody note
+                    // Melody note -> melodyBus (with reverb send)
                     if (currentSongMelody.length > 0) {
                         const freq = currentSongMelody[bi % currentSongMelody.length];
                         if (freq > 0) {
-                            _scheduleNote(freq, beatTime, beatDuration * 0.8, 'square', musicGain, 0.15);
+                            _scheduleNote(freq, beatTime, beatDuration * 0.8, 'square', melodyBus, 0.15);
                         }
                     }
 
-                    // Bass (every other beat)
+                    // Bass (every other beat) -> bassBus (dry, punchy)
                     if (bi % 2 === 0 && currentSongBass.length > 0) {
                         const bf = currentSongBass[Math.floor(bi / 2) % currentSongBass.length];
                         if (bf > 0) {
-                            _scheduleNote(bf, beatTime, beatDuration * 0.6, 'triangle', musicGain, 0.2);
+                            _scheduleNote(bf, beatTime, beatDuration * 0.6, 'triangle', bassBus, 0.2);
                         }
                     }
 
-                    // Improved drums
+                    // Improved drums (layered samples) -> drumBus
                     _scheduleDrums(bi, beatTime, beatDuration);
                 }
 
@@ -389,30 +471,53 @@ const Audio = (() => {
         }, 25); // 25ms lookahead interval (tight, drift-free)
     }
 
-    // Punchy kick: sine sweep from 180Hz down to 50Hz
+    // Layered kick: sub (sine sweep 180->50Hz body) + click (highpass noise transient).
+    // Routes through drumBus (separate mix-bus) for clean mixing headroom.
     function _scheduleKick(time) {
         const c = ctx;
+        if (!c || !drumBus) return;
         try {
-            const osc = c.createOscillator();
-            const env = c.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(180, time);
-            osc.frequency.exponentialRampToValueAtTime(50, time + 0.08);
-            env.gain.setValueAtTime(0.35, time);
-            env.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
-            osc.connect(env);
-            env.connect(musicGain);
-            osc.start(time);
-            osc.stop(time + 0.16);
+            // SUB BODY — sine sweep
+            const sub = c.createOscillator();
+            const subEnv = c.createGain();
+            sub.type = 'sine';
+            sub.frequency.setValueAtTime(180, time);
+            sub.frequency.exponentialRampToValueAtTime(50, time + 0.08);
+            subEnv.gain.setValueAtTime(0.35, time);
+            subEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+            sub.connect(subEnv);
+            subEnv.connect(drumBus);
+            sub.start(time);
+            sub.stop(time + 0.16);
+
+            // CLICK — very short highpass noise transient (gives kick punch on small speakers)
+            const clickSize = Math.floor(c.sampleRate * 0.012);
+            const clickBuf = c.createBuffer(1, clickSize, c.sampleRate);
+            const cd = clickBuf.getChannelData(0);
+            for (let i = 0; i < clickSize; i++) cd[i] = (Math.random() * 2 - 1) * 0.5;
+            const click = c.createBufferSource();
+            click.buffer = clickBuf;
+            const clickHp = c.createBiquadFilter();
+            clickHp.type = 'highpass';
+            clickHp.frequency.value = 1500;
+            const clickEnv = c.createGain();
+            clickEnv.gain.setValueAtTime(0.18, time);
+            clickEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+            click.connect(clickHp);
+            clickHp.connect(clickEnv);
+            clickEnv.connect(drumBus);
+            click.start(time);
+            click.stop(time + 0.02);
         } catch (e) {}
     }
 
-    // Snare: noise burst + sine body
+    // Layered snare: body (sine pitch envelope) + crack (highpass noise).
     function _scheduleSnare(time) {
         const c = ctx;
+        if (!c || !drumBus) return;
         try {
-            // Noise burst (using high-freq oscillator trick)
-            const bufferSize = c.sampleRate * 0.08;
+            // CRACK — noise burst
+            const bufferSize = Math.floor(c.sampleRate * 0.08);
             const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
@@ -424,15 +529,15 @@ const Audio = (() => {
             noiseFilter.type = 'highpass';
             noiseFilter.frequency.value = 2000;
             const noiseEnv = c.createGain();
-            noiseEnv.gain.setValueAtTime(0.2, time);
+            noiseEnv.gain.setValueAtTime(0.22, time);
             noiseEnv.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
             noise.connect(noiseFilter);
             noiseFilter.connect(noiseEnv);
-            noiseEnv.connect(musicGain);
+            noiseEnv.connect(drumBus);
             noise.start(time);
             noise.stop(time + 0.1);
 
-            // Sine body
+            // BODY — sine with quick pitch drop
             const osc = c.createOscillator();
             const env = c.createGain();
             osc.type = 'sine';
@@ -441,18 +546,19 @@ const Audio = (() => {
             env.gain.setValueAtTime(0.18, time);
             env.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
             osc.connect(env);
-            env.connect(musicGain);
+            env.connect(drumBus);
             osc.start(time);
             osc.stop(time + 0.12);
         } catch (e) {}
     }
 
-    // Hi-hat: filtered noise, short and crispy
+    // Hi-hat: filtered noise, short and crispy (routes to drumBus).
     function _scheduleHiHat(time, open) {
         const c = ctx;
+        if (!c || !drumBus) return;
         try {
             const dur = open ? 0.08 : 0.03;
-            const bufferSize = c.sampleRate * dur;
+            const bufferSize = Math.floor(c.sampleRate * dur);
             const buffer = c.createBuffer(1, bufferSize, c.sampleRate);
             const data = buffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
@@ -468,7 +574,7 @@ const Audio = (() => {
             env.gain.exponentialRampToValueAtTime(0.001, time + dur);
             noise.connect(hpf);
             hpf.connect(env);
-            env.connect(musicGain);
+            env.connect(drumBus);
             noise.start(time);
             noise.stop(time + dur + 0.01);
         } catch (e) {}
@@ -510,7 +616,7 @@ const Audio = (() => {
                 env.gain.setValueAtTime(0, c.currentTime);
                 env.gain.linearRampToValueAtTime(1.0, c.currentTime + 2); // slow fade in
                 osc.connect(env);
-                env.connect(padGain);
+                env.connect(padBus);
                 osc.start(c.currentTime);
                 activePadOscs.push({ osc, env });
             } catch (e) {}
@@ -561,20 +667,19 @@ const Audio = (() => {
     function getBPM() { return currentBPM; }
 
     // === TTS ===
+    // Uses centralized _duckStart/_duckEnd so multiple voice lines stack via ref-count.
     function speak(text) {
         if (!settings.voice) return;
         try {
-            // Duck music while speaking
-            if (musicGain) {
-                musicGain.gain.linearRampToValueAtTime(0.1, _getCtx().currentTime + 0.3);
-            }
+            _duckStart();
             const u = new SpeechSynthesisUtterance(text);
             u.rate = 0.85;
             u.pitch = 1.1;
+            let _ended = false;
             const _restoreMusic = () => {
-                if (musicGain) {
-                    musicGain.gain.linearRampToValueAtTime(MUSIC_VOL, _getCtx().currentTime + 0.3);
-                }
+                if (_ended) return;
+                _ended = true;
+                _duckEnd();
             };
             u.onend = _restoreMusic;
             u.onerror = _restoreMusic;
@@ -583,12 +688,13 @@ const Audio = (() => {
             speechSynthesis.cancel();
             speechSynthesis.speak(u);
         } catch (e) {
-            // Restore music if TTS fails
-            if (musicGain) {
-                musicGain.gain.linearRampToValueAtTime(MUSIC_VOL, _getCtx().currentTime + 0.3);
-            }
+            _duckEnd();
         }
     }
+
+    // Public ducking API so CloudTTS (which uses a separate Web Audio path) can hook in.
+    function duckStart() { _duckStart(); }
+    function duckEnd() { _duckEnd(); }
 
     function setSettings(s) { Object.assign(settings, s); }
 
@@ -597,6 +703,7 @@ const Audio = (() => {
         perfectHit, greatHit, okHit, miss, missEncouragement,
         comboBreak, comboMilestone, streakChime3, streakFanfare,
         countdown, countdownGo, songComplete, speak,
+        duckStart, duckEnd,
         startSong, stopSong, getBeatIndex, getBPM,
         setSettings, SCALE, NOTES_ARR
     };

@@ -1,5 +1,5 @@
 // Rhythm Blast — Service Worker
-const CACHE_NAME = 'rhythm-blast-v27';
+const CACHE_NAME = 'rhythm-blast-v28';
 const ASSETS = [
     './',
     './index.html',
@@ -19,6 +19,10 @@ const ASSETS = [
     './js/ecosystem.js',
     './js/cloud-tts.js',
     './js/otb-config.js',
+    './js/achievements.js',
+    './js/auto-update.js',
+    './js/error-boundary.js',
+    './js/analytics.js',
     './assets/banner.png',
     './manifest.json',
     './assets/sounds/sfx/click.mp3',

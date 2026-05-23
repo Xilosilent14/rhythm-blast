@@ -12,6 +12,9 @@ const Game = (() => {
     const LANES = 3;
     const LANE_COLORS = ['#22d3ee', '#a855f7', '#ec4899']; // cyan, purple, magenta
     const LANE_GLOW = ['rgba(34,211,238,0.3)', 'rgba(168,85,247,0.3)', 'rgba(236,72,153,0.3)'];
+    // Shape differentiation for color-blind accessibility — each lane has a unique shape.
+    // 0 = triangle (left), 1 = square (middle), 2 = circle (right).
+    const LANE_SHAPES = ['triangle', 'square', 'circle'];
     let laneWidth = 0;
     let laneXs = [];
     let hitZoneY = 0;
@@ -73,6 +76,17 @@ const Game = (() => {
     let hitFeedbackTimer = 0;
     let bgHue = 240; // slowly shifting background
 
+    // Particle cap — Fire 7 has 1GB RAM / 4 cores. Halve effects on low-end devices.
+    function _isLowEndDevice() {
+        try {
+            if (navigator.deviceMemory && navigator.deviceMemory < 3) return true;
+            if (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 4) return true;
+        } catch (_) {}
+        return false;
+    }
+    const PARTICLE_CAP = _isLowEndDevice() ? 50 : 100;
+    const COMBO_PARTICLE_MAX = _isLowEndDevice() ? 15 : 30;
+
     // Lane flash (per-lane activation glow on hit)
     let laneFlash = [0, 0, 0];
 
@@ -92,17 +106,30 @@ const Game = (() => {
     const Q_PHASE_TIMEOUT = 12000; // 12s before auto-advancing
 
     // Speak the question via CloudTTS (preferred on Silk) with fallback to Audio.speak.
+    // Music bus is ducked via Audio.duckStart/duckEnd around CloudTTS playback
+    // (CloudTTS routes through its own AudioContext but ducking targets the music bus).
     function _speakQuestion() {
         if (!qPhase) return;
         const text = qPhase.questionSpeak || qPhase.question || '';
         if (!text) return;
         try {
             if (typeof CloudTTS !== 'undefined' && CloudTTS.speak) {
-                CloudTTS.speak(text, { volume: 0.85 });
+                let _undeckedOnce = false;
+                const _undeck = () => {
+                    if (_undeckedOnce) return;
+                    _undeckedOnce = true;
+                    if (Audio.duckEnd) Audio.duckEnd();
+                };
+                if (Audio.duckStart) Audio.duckStart();
+                CloudTTS.speak(text, { volume: 0.85, onEnd: _undeck });
+                // Safety: undeck after a generous timeout in case onEnd never fires.
+                setTimeout(_undeck, 6000);
             } else if (typeof Audio !== 'undefined' && Audio.speak) {
                 Audio.speak(text);
             }
-        } catch (e) {}
+        } catch (e) {
+            if (Audio.duckEnd) try { Audio.duckEnd(); } catch (_) {}
+        }
     }
 
     function _startQuestionPhase(questionData) {
@@ -222,6 +249,7 @@ const Game = (() => {
     let perfectStreak = 0;
     function _checkStreakCelebration() {
         perfectStreak++;
+        if (typeof Analytics !== 'undefined') Analytics.streak(perfectStreak);
         if (perfectStreak === 3) {
             Audio.streakChime3();
             _flashScreenPulse();
@@ -365,6 +393,12 @@ const Game = (() => {
         songStartTime = Date.now();
         running = true;
 
+        // Analytics: log song start (BPM + difficulty)
+        if (typeof Analytics !== 'undefined') {
+            const _diff = (Progress.getSettings && Progress.getSettings().difficulty) || 'normal';
+            Analytics.songStart(song.id, song.name, _diff, song.bpm);
+        }
+
         // Start audio
         Audio.startSong(song, _onBeat);
 
@@ -492,6 +526,7 @@ const Game = (() => {
                 if (n.type === 'sequence-answer' && !n.isCorrect) return; // wrong answer in sequence, don't count
                 if (n.type === 'identify' && !n.isCorrect) return; // wrong answer in identify, don't count as miss
                 misses++;
+                if (typeof Analytics !== 'undefined') Analytics.hit('miss');
 
                 _resetPerfectStreak();
                 if (diff === 'easy') {
@@ -703,21 +738,38 @@ const Game = (() => {
         ctx.fillRect(laneStart, hitZoneY - HIT_ZONE_HEIGHT / 2, totalLaneWidth, HIT_ZONE_HEIGHT * pulse);
         ctx.shadowBlur = 0;
 
-        // Lane target circles — larger and more visible
+        // Lane target shapes — distinct per lane for color-blind accessibility.
+        // Lane 0 = triangle, Lane 1 = square, Lane 2 = circle.
         for (let i = 0; i < LANES; i++) {
-            // Filled target background for visibility
+            const r = 34 + beatPulse * 5;
+            // Filled background
             ctx.fillStyle = LANE_GLOW[i].replace('0.3', '0.12');
-            ctx.beginPath();
-            ctx.arc(laneXs[i], hitZoneY, 34 + beatPulse * 5, 0, Math.PI * 2);
+            _pathLaneShape(ctx, laneXs[i], hitZoneY, r, LANE_SHAPES[i]);
             ctx.fill();
 
+            // Outline in lane color
             ctx.strokeStyle = LANE_COLORS[i];
             ctx.lineWidth = 3 + beatPulse * 2;
             ctx.globalAlpha = 0.5 + beatPulse * 0.3;
-            ctx.beginPath();
-            ctx.arc(laneXs[i], hitZoneY, 34 + beatPulse * 5, 0, Math.PI * 2);
+            _pathLaneShape(ctx, laneXs[i], hitZoneY, r, LANE_SHAPES[i]);
             ctx.stroke();
             ctx.globalAlpha = 1;
+        }
+    }
+
+    // Trace the given lane-target shape onto the current ctx path.
+    function _pathLaneShape(ctx, cx, cy, r, shape) {
+        ctx.beginPath();
+        if (shape === 'triangle') {
+            // Upward triangle, equilateral-ish
+            ctx.moveTo(cx, cy - r);
+            ctx.lineTo(cx + r * 0.866, cy + r * 0.5);
+            ctx.lineTo(cx - r * 0.866, cy + r * 0.5);
+            ctx.closePath();
+        } else if (shape === 'square') {
+            ctx.rect(cx - r * 0.85, cy - r * 0.85, r * 1.7, r * 1.7);
+        } else {
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
         }
     }
 
@@ -951,6 +1003,7 @@ const Game = (() => {
                 laneFlash[closestNote.lane] = 1.0;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, '#ffd700', 20);
                 _checkStreakCelebration();
+                if (typeof Analytics !== 'undefined') Analytics.hit('perfect');
             } else if (timeDist <= W.GREAT) {
                 points = 75;
                 label = 'GREAT!';
@@ -960,6 +1013,7 @@ const Game = (() => {
                 laneFlash[closestNote.lane] = 0.7;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, LANE_COLORS[closestNote.lane], 12);
                 _resetPerfectStreak(); // streak is perfects-only
+                if (typeof Analytics !== 'undefined') Analytics.hit('great');
             } else {
                 points = 50;
                 label = 'OK';
@@ -969,6 +1023,7 @@ const Game = (() => {
                 laneFlash[closestNote.lane] = 0.4;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, LANE_COLORS[closestNote.lane], 6);
                 _resetPerfectStreak();
+                if (typeof Analytics !== 'undefined') Analytics.hit('ok');
             }
 
             combo++;
@@ -1011,6 +1066,7 @@ const Game = (() => {
             Audio.missEncouragement();
             _spawnMissEffect(laneXs[closestNote.lane], hitZoneY);
             _showFeedback('Try again!', '#f59e0b');
+            if (typeof Analytics !== 'undefined') Analytics.hit('miss');
 
             noteResults.push({
                 topic: closestNote.domain === 'math' ? 'math' : 'reading',
@@ -1034,8 +1090,10 @@ const Game = (() => {
     }
 
     function _spawnParticles(x, y, color, count) {
-        if (particles.length > 400) return; // Performance cap
-        for (let i = 0; i < count; i++) {
+        if (particles.length > PARTICLE_CAP * 4) return; // Performance hard cap (overall pool)
+        // Per-call cap — on low-end devices we halve burst sizes too.
+        const capped = Math.min(count, PARTICLE_CAP / 2);
+        for (let i = 0; i < capped; i++) {
             particles.push({
                 x, y,
                 vx: (Math.random() - 0.5) * 6,
@@ -1055,15 +1113,45 @@ const Game = (() => {
         const stars = accuracy >= 0.9 ? 3 : accuracy >= 0.7 ? 2 : accuracy >= 0.5 ? 1 : 0;
         const grade = accuracy >= 0.95 ? 'S' : accuracy >= 0.85 ? 'A' : accuracy >= 0.7 ? 'B' : accuracy >= 0.5 ? 'C' : 'D';
 
+        // Variable-reward "bonus star" — top-10% performance triggers a celebratory bonus.
+        // Trigger conditions (all must hold):
+        //  - 3 stars
+        //  - perfect ratio >= 0.9 (90% of all hits are perfect)
+        //  - max combo >= 80% of totalNotes (sustained streak)
+        // Bonus is surfaced via result.bonusStar; main.js shows a special toast.
+        const perfectRatio = totalNotes > 0 ? perfects / totalNotes : 0;
+        const comboRatio = totalNotes > 0 ? maxCombo / totalNotes : 0;
+        const bonusStar = (stars === 3 && perfectRatio >= 0.9 && comboRatio >= 0.8);
+
+        // Mystery unlock — at certain milestone star totals (10, 25, 50), flag a
+        // mystery-bonus event so the UI can play a surprise reveal. The Hub or
+        // achievements layer handles the actual unlock; we just signal it here.
+        let mysteryUnlock = null;
+        if (typeof Progress !== 'undefined' && Progress.getTotalStars) {
+            const totalNow = Progress.getTotalStars() + stars;
+            // Use localStorage to mark each tier only once.
+            const tiers = [10, 25, 50, 100];
+            for (let i = 0; i < tiers.length; i++) {
+                const tier = tiers[i];
+                const flag = 'rb_mystery_' + tier;
+                if (totalNow >= tier && !localStorage.getItem(flag)) {
+                    try { localStorage.setItem(flag, '1'); } catch (_) {}
+                    mysteryUnlock = tier;
+                    break;
+                }
+            }
+        }
+
         // XP calculation
         const baseXP = Math.round(score / 10);
         const starBonus = stars * 5;
-        const xpEarned = baseXP + starBonus;
+        const bonusXP = bonusStar ? 25 : 0;
+        const xpEarned = baseXP + starBonus + bonusXP;
 
         // Ecosystem tracking
         if (typeof OTBEcosystem !== 'undefined') {
             OTBEcosystem.addXP(xpEarned, 'rhythm-blast');
-            OTBEcosystem.addCoins(stars, 'rhythm-blast');
+            OTBEcosystem.addCoins(stars + (bonusStar ? 1 : 0), 'rhythm-blast');
             noteResults.forEach(r => {
                 OTBEcosystem.recordAnswer(
                     r.topic === 'math' ? 'rhythm-math' : 'rhythm-reading',
@@ -1075,12 +1163,47 @@ const Game = (() => {
             });
         }
 
+        // Analytics: structured song_complete event
+        if (typeof Analytics !== 'undefined') {
+            Analytics.songComplete({
+                songId: currentSong.id,
+                score: score,
+                accuracy: accuracy,
+                stars: stars,
+                bonusStar: bonusStar,
+                grade: grade,
+                xpEarned: xpEarned,
+                mysteryUnlock: mysteryUnlock
+            });
+        }
+
+        // Cross-game card drop: 3-star songs drop a Creature Cards pack.
+        // Writes into the shared 'bbg_pending_card_drops' queue; Creature Cards
+        // drains it on next open. See OTB-Creature-Cards/js/cross-game-drops.js.
+        if (stars >= 3) {
+            try {
+                const KEY = 'bbg_pending_card_drops';
+                const raw = localStorage.getItem(KEY);
+                const arr = raw ? JSON.parse(raw) : [];
+                arr.push({
+                    source: 'rhythm-blast',
+                    reason: 'song-3-star:' + currentSong.id,
+                    packType: bonusStar ? 'victory' : 'daily',
+                    t: Date.now()
+                });
+                while (arr.length > 20) arr.shift();
+                localStorage.setItem(KEY, JSON.stringify(arr));
+            } catch (_) {}
+        }
+
         if (onSongEnd) {
             onSongEnd({
                 songId: currentSong.id,
                 score, accuracy, stars, grade, xpEarned,
                 perfects, greats, oks, misses,
-                maxCombo, totalNotes, combo: maxCombo
+                maxCombo, totalNotes, combo: maxCombo,
+                bonusStar: bonusStar,
+                mysteryUnlock: mysteryUnlock
             });
         }
     }
@@ -1162,7 +1285,8 @@ const Game = (() => {
         const cx = rect.width / 2;
         const cy = rect.height / 2;
         const colors = ['#ffd700', '#ff6b6b', '#a855f7', '#4ecdc4', '#ff9f43'];
-        const particleCount = count >= 50 ? 30 : 15;
+        // Respect device-class cap to keep Fire 7 framerate steady
+        const particleCount = Math.min(count >= 50 ? 30 : 15, COMBO_PARTICLE_MAX);
         for (let i = 0; i < particleCount; i++) {
             const el = document.createElement('div');
             el.style.cssText = `position:fixed;width:8px;height:8px;border-radius:50%;pointer-events:none;z-index:9999;background:${colors[i % colors.length]};left:${rect.left + cx}px;top:${rect.top + cy}px;`;

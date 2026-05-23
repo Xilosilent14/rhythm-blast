@@ -236,29 +236,39 @@ const Main = (() => {
             const diffEmoji = song.difficulty === 1 ? '🟢' : song.difficulty === 3 ? '🔴' : '🟡';
             const diffLabel = song.difficulty === 1 ? 'Easy' : song.difficulty === 3 ? 'Hard' : 'Normal';
 
+            const ariaLabel = locked
+                ? `${song.name}, ${diffLabel} difficulty, locked. Requires ${song.starsRequired} stars.`
+                : `${song.name}, ${diffLabel} difficulty, ${song.bpm} BPM, ${stars.stars} of 3 stars earned. Press to play.`;
             return `
-                <div class="song-card ${locked ? 'locked' : ''}" data-song="${song.id}" tabindex="0">
+                <div class="song-card ${locked ? 'locked' : ''}" data-song="${song.id}" tabindex="0" role="button" aria-label="${ariaLabel}" aria-disabled="${locked}">
                     <div class="song-banner ${song.bannerClass}">
                         <span class="diff-badge" aria-label="${diffLabel} difficulty">${diffEmoji}</span>
-                        <span style="font-size:2rem;z-index:1;">${song.emoji}</span>
-                        ${locked ? '<span class="lock-icon">🔒</span>' : ''}
+                        <span style="font-size:2rem;z-index:1;" aria-hidden="true">${song.emoji}</span>
+                        ${locked ? '<span class="lock-icon" aria-hidden="true">🔒</span>' : ''}
                     </div>
                     <div class="song-info">
                         <div class="song-name">${song.name}</div>
                         <div class="song-meta">${song.bpm} BPM</div>
-                        <div class="song-stars">${starDisplay}</div>
-                        <div class="song-difficulty">${diffDots}</div>
+                        <div class="song-stars" aria-label="${stars.stars} of 3 stars">${starDisplay}</div>
+                        <div class="song-difficulty" aria-hidden="true">${diffDots}</div>
                         ${stars.highScore > 0 ? `<div class="song-meta">Best: ${stars.highScore}</div>` : ''}
                     </div>
                 </div>
             `;
         }).join('');
 
-        // Wire click handlers
+        // Wire click + keyboard activation handlers (Enter/Space) for accessibility.
         grid.querySelectorAll('.song-card:not(.locked)').forEach(card => {
-            card.addEventListener('click', () => {
+            const activate = () => {
                 const songId = card.dataset.song;
                 _startSong(songId);
+            };
+            card.addEventListener('click', activate);
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activate();
+                }
             });
         });
     }
@@ -355,6 +365,29 @@ const Main = (() => {
 
         // Save progress
         Progress.recordSongResult(result.songId, result);
+
+        // Bonus star toast (variable reward for top-10% performance)
+        if (result.bonusStar) {
+            const toast = document.createElement('div');
+            toast.className = 'achievement-toast';
+            toast.style.background = 'linear-gradient(135deg,#ffd700,#f59e0b)';
+            toast.style.color = '#1a1a2e';
+            toast.textContent = '🌟 BONUS STAR! Top 10% performance!';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        // Mystery unlock toast (surprise milestone reveal)
+        if (result.mysteryUnlock) {
+            setTimeout(() => {
+                const toast = document.createElement('div');
+                toast.className = 'achievement-toast';
+                toast.style.background = 'linear-gradient(135deg,#a855f7,#ec4899)';
+                toast.textContent = '🎁 Mystery unlocked at ' + result.mysteryUnlock + ' stars!';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+            }, 800);
+        }
 
         // Check achievements
         if (typeof Achievements !== 'undefined') {
@@ -462,14 +495,8 @@ const Main = (() => {
 })();
 
 
-// Global error handler - catch runtime errors gracefully
-window.onerror = function(msg, source, line, col, error) {
-    console.error("Runtime error:", msg, "at", source, line + ":" + col);
-    return false;
-};
-window.addEventListener("unhandledrejection", function(event) {
-    console.error("Unhandled promise rejection:", event.reason);
-});
+// Global error handler is provided by js/error-boundary.js (loaded first in index.html).
+// Do not redefine window.onerror here — it would clobber the structured [bbg.err] logging.
 
 // ===========================================================
 // PWA: Service Worker + Install Prompt

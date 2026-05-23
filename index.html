@@ -272,6 +272,9 @@
         </div>
     </div>
 
+    <!-- Error boundary loads FIRST so any subsequent script error gets captured -->
+    <script src="js/error-boundary.js"></script>
+    <script src="js/analytics.js"></script>
     <script src="js/math-data.js"></script>
     <script src="js/reading-data.js"></script>
     <script src="js/audio.js"></script>
