@@ -91,6 +91,20 @@ const Game = (() => {
     let qPhaseTimer = 0; // auto-advance timer
     const Q_PHASE_TIMEOUT = 12000; // 12s before auto-advancing
 
+    // Speak the question via CloudTTS (preferred on Silk) with fallback to Audio.speak.
+    function _speakQuestion() {
+        if (!qPhase) return;
+        const text = qPhase.questionSpeak || qPhase.question || '';
+        if (!text) return;
+        try {
+            if (typeof CloudTTS !== 'undefined' && CloudTTS.speak) {
+                CloudTTS.speak(text, { volume: 0.85 });
+            } else if (typeof Audio !== 'undefined' && Audio.speak) {
+                Audio.speak(text);
+            }
+        } catch (e) {}
+    }
+
     function _startQuestionPhase(questionData) {
         qPhase = { ...questionData, answered: false, startTime: Date.now() };
         running = false; // pause note falling
@@ -108,9 +122,8 @@ const Game = (() => {
         feedbackEl.style.color = '';
 
         // SPEAK the TTS-friendly version (without visual clutter)
-        if (typeof Audio !== 'undefined' && Audio.speak) {
-            setTimeout(() => Audio.speak(questionData.questionSpeak || questionData.question), 200);
-        }
+        // 200ms gate is fine here because it's a one-shot, not a musical event.
+        setTimeout(_speakQuestion, 200);
 
         answersEl.innerHTML = questionData.answers.map((a, i) =>
             `<button class="qp-answer-btn" data-idx="${i}">${a}</button>`
@@ -119,6 +132,15 @@ const Game = (() => {
         answersEl.querySelectorAll('.qp-answer-btn').forEach(btn => {
             btn.addEventListener('click', () => _onQuestionAnswer(parseInt(btn.dataset.idx)));
         });
+
+        // Wire the "Hear again" voice replay button (rebuilt fresh each question).
+        const replayBtn = document.getElementById('qp-replay-btn');
+        if (replayBtn) {
+            // Clone to drop any previous listeners.
+            const fresh = replayBtn.cloneNode(true);
+            replayBtn.parentNode.replaceChild(fresh, replayBtn);
+            fresh.addEventListener('click', _speakQuestion);
+        }
 
         overlay.style.display = 'flex';
 
@@ -147,14 +169,17 @@ const Game = (() => {
         if (correct) {
             feedbackEl.textContent = 'Correct!';
             feedbackEl.style.color = '#2ecc71';
-            Audio.perfectHit();
+            Audio.perfectHit(); // sample-accurate, <100ms confirmation
             combo++;
             if (combo > maxCombo) maxCombo = combo;
             score += 100;
+            _checkStreakCelebration(); // streak chimes/fanfare on milestones
         } else {
             feedbackEl.textContent = idx === -1 ? 'Time up!' : 'Not quite!';
             feedbackEl.style.color = '#f59e0b';
-            Audio.miss();
+            Audio.miss(); // gentle neutral chime (no harsh descend)
+            // Encourage with a rotating gentle TTS phrase
+            Audio.missEncouragement();
             // Don't reset combo on easy
             const diff = (Progress.getSettings && Progress.getSettings().difficulty) || 'normal';
             if (diff === 'easy') combo = Math.max(0, combo - 1);
@@ -164,7 +189,7 @@ const Game = (() => {
         // Track for ecosystem
         noteResults.push({ topic: qPhase.domain || 'math', correct });
 
-        // Resume after feedback delay
+        // Resume rhythm 1s after a correct answer, 1.8s after a miss (gives kid time to read).
         setTimeout(() => {
             document.getElementById('question-phase').style.display = 'none';
             qPhase = null;
@@ -190,7 +215,45 @@ const Game = (() => {
                 totalNotes++;
             }
             _loop();
-        }, correct ? 1200 : 1800);
+        }, correct ? 1000 : 1800);
+    }
+
+    // Streak counter (resets on any miss/wrong tap).
+    let perfectStreak = 0;
+    function _checkStreakCelebration() {
+        perfectStreak++;
+        if (perfectStreak === 3) {
+            Audio.streakChime3();
+            _flashScreenPulse();
+        } else if (perfectStreak === 5) {
+            Audio.streakChime3();
+            _flashStreakText('Perfect Streak!');
+        } else if (perfectStreak === 10 || (perfectStreak > 10 && perfectStreak % 10 === 0)) {
+            Audio.streakFanfare();
+            _flashStreakText('🔥 ' + perfectStreak + ' STREAK!');
+            _spawnComboParticles(perfectStreak);
+        }
+    }
+
+    function _resetPerfectStreak() {
+        perfectStreak = 0;
+    }
+
+    // Brief screen pulse overlay (CSS animation). Does NOT block input.
+    function _flashScreenPulse() {
+        const el = document.createElement('div');
+        el.className = 'streak-pulse';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 500);
+    }
+
+    // Brief "Perfect Streak!" text pop overlay. Does NOT block input.
+    function _flashStreakText(text) {
+        const el = document.createElement('div');
+        el.className = 'streak-pop';
+        el.textContent = text;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1200);
     }
 
     // Callbacks
@@ -255,6 +318,7 @@ const Game = (() => {
         beatPulse = 0;
         beatsElapsed = 0;
         lastBeatProcessed = -1;
+        perfectStreak = 0;
 
         // Generate all notes from chart
         noteQueue = [];
@@ -429,6 +493,7 @@ const Game = (() => {
                 if (n.type === 'identify' && !n.isCorrect) return; // wrong answer in identify, don't count as miss
                 misses++;
 
+                _resetPerfectStreak();
                 if (diff === 'easy') {
                     // On Easy: softer punishment. Don't break combo for first miss, just reduce it
                     if (combo > 2) {
@@ -436,7 +501,7 @@ const Game = (() => {
                     } else {
                         combo = 0;
                     }
-                    _showFeedback('MISS', '#f59e0b'); // amber instead of angry red
+                    _showFeedback('Try again!', '#f59e0b'); // gentle, not punitive
                 } else {
                     if (combo > 0) {
                         Audio.comboBreak();
@@ -444,7 +509,7 @@ const Game = (() => {
                     }
                     combo = 0;
                     _spawnMissEffect(laneXs[n.lane], hitZoneY);
-                    _showFeedback('MISS', '#e74c3c');
+                    _showFeedback('Almost!', '#f59e0b'); // gentle phrasing
                 }
             }
         });
@@ -797,21 +862,40 @@ const Game = (() => {
     }
 
     // === INPUT HANDLING ===
+    // Lane forgiveness: each lane has a "true" rendered width (laneWidth) but the *touch*
+    // hitbox extends ±LANE_TOUCH_RADIUS px from the lane center. This makes it much harder
+    // for a 6yo on a Fire tablet to fat-finger into a dead zone between lanes.
+    const LANE_TOUCH_RADIUS = 120;    // ±120px around lane center (240px total)
+    const LANE_NEARMISS_RADIUS = 40;  // flash lane on near-miss to guide thumb back
+
     function handleTap(x, y) {
         if (!running) return;
 
         const W = _getWindows();
 
-        // Determine which lane was tapped
+        // Pick the closest lane center within LANE_TOUCH_RADIUS.
         let tappedLane = -1;
+        let bestDist = LANE_TOUCH_RADIUS;
         for (let i = 0; i < LANES; i++) {
-            const lx = laneXs[i] - laneWidth / 2;
-            if (x >= lx && x < lx + laneWidth) {
+            const d = Math.abs(x - laneXs[i]);
+            if (d < bestDist) {
+                bestDist = d;
                 tappedLane = i;
-                break;
             }
         }
-        if (tappedLane === -1) return;
+        // Near-miss visual cue: light up the closest lane briefly so the kid knows where
+        // their finger ALMOST landed. Doesn't register as a hit.
+        if (tappedLane === -1) {
+            let nearestLane = 0, nearestD = Infinity;
+            for (let i = 0; i < LANES; i++) {
+                const d = Math.abs(x - laneXs[i]);
+                if (d < nearestD) { nearestD = d; nearestLane = i; }
+            }
+            if (nearestD < LANE_TOUCH_RADIUS + LANE_NEARMISS_RADIUS) {
+                laneFlash[nearestLane] = 0.3; // gentle guidance flash
+            }
+            return;
+        }
 
         // Find closest unhit note in this lane near the hit zone
         let closestNote = null;
@@ -866,6 +950,7 @@ const Game = (() => {
                 screenShake = 2;
                 laneFlash[closestNote.lane] = 1.0;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, '#ffd700', 20);
+                _checkStreakCelebration();
             } else if (timeDist <= W.GREAT) {
                 points = 75;
                 label = 'GREAT!';
@@ -874,6 +959,7 @@ const Game = (() => {
                 Audio.greatHit();
                 laneFlash[closestNote.lane] = 0.7;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, LANE_COLORS[closestNote.lane], 12);
+                _resetPerfectStreak(); // streak is perfects-only
             } else {
                 points = 50;
                 label = 'OK';
@@ -882,6 +968,7 @@ const Game = (() => {
                 Audio.okHit();
                 laneFlash[closestNote.lane] = 0.4;
                 _spawnParticles(laneXs[closestNote.lane], hitZoneY, LANE_COLORS[closestNote.lane], 6);
+                _resetPerfectStreak();
             }
 
             combo++;
@@ -911,7 +998,7 @@ const Game = (() => {
                 correct: true
             });
         } else {
-            // Wrong answer
+            // Wrong answer — gentle feedback, no harsh sound, rotating encouragement.
             closestNote.hit = true; // Remove it
             misses++;
             if (combo > 0) {
@@ -919,9 +1006,11 @@ const Game = (() => {
                 comboMeterBreaking = 1.0;
             }
             combo = 0;
+            _resetPerfectStreak();
             Audio.miss();
+            Audio.missEncouragement();
             _spawnMissEffect(laneXs[closestNote.lane], hitZoneY);
-            _showFeedback('WRONG', '#e74c3c');
+            _showFeedback('Try again!', '#f59e0b');
 
             noteResults.push({
                 topic: closestNote.domain === 'math' ? 'math' : 'reading',

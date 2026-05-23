@@ -231,10 +231,15 @@ const Main = (() => {
             const diffDots = Array.from({ length: 3 }, (_, i) =>
                 `<div class="diff-dot ${i < song.difficulty ? 'filled' : ''}"></div>`
             ).join('');
+            // Difficulty emoji indicator (per Fire-tablet review feedback):
+            // 1 = easy (green), 2 = normal (yellow), 3 = hard (red).
+            const diffEmoji = song.difficulty === 1 ? '🟢' : song.difficulty === 3 ? '🔴' : '🟡';
+            const diffLabel = song.difficulty === 1 ? 'Easy' : song.difficulty === 3 ? 'Hard' : 'Normal';
 
             return `
                 <div class="song-card ${locked ? 'locked' : ''}" data-song="${song.id}" tabindex="0">
                     <div class="song-banner ${song.bannerClass}">
+                        <span class="diff-badge" aria-label="${diffLabel} difficulty">${diffEmoji}</span>
                         <span style="font-size:2rem;z-index:1;">${song.emoji}</span>
                         ${locked ? '<span class="lock-icon">🔒</span>' : ''}
                     </div>

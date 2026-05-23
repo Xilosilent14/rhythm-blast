@@ -928,12 +928,16 @@ html, body {
 .lane-label:nth-child(2) { border-color: #a855f7; }
 .lane-label:nth-child(3) { border-color: #ec4899; }
 
-/* === Question Phase Overlay (replaces question-during-rhythm) === */
+/* === Question Phase Overlay (replaces question-during-rhythm) ===
+   Fully opaque so falling notes don't distract from reading the question.
+   The 1px-from-transparent dark wash also doubles as a canvas darken-layer. */
 .question-phase-overlay {
     position: absolute;
     inset: 0;
     z-index: 100;
-    background: rgba(10, 10, 30, 0.92);
+    background: rgba(10, 10, 30, 0.97);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -968,17 +972,38 @@ html, body {
 }
 .qp-answer-btn {
     font-family: var(--otb-font-heading);
-    font-size: 1.2rem;
-    padding: 16px 28px;
+    font-size: 1.3rem;
+    padding: 18px 32px;
     border: 3px solid rgba(168, 85, 247, 0.5);
-    border-radius: 12px;
+    border-radius: 14px;
     background: rgba(168, 85, 247, 0.15);
     color: #fff;
     cursor: pointer;
-    min-width: 140px;
-    min-height: 60px;
+    min-width: 160px;
+    min-height: 80px; /* Fire-tablet primary CTA floor */
     transition: all 0.15s;
 }
+
+/* "Hear again" voice replay button (only on question overlay). 64px target. */
+.qp-replay-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 auto 18px;
+    padding: 12px 22px;
+    min-height: 64px;
+    min-width: 160px;
+    font-family: var(--otb-font-heading);
+    font-size: 1.05rem;
+    color: #fff;
+    background: rgba(34, 211, 238, 0.18);
+    border: 2px solid rgba(34, 211, 238, 0.55);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: transform 0.12s, background 0.15s, box-shadow 0.15s;
+}
+.qp-replay-btn:hover { background: rgba(34, 211, 238, 0.28); box-shadow: 0 0 14px rgba(34, 211, 238, 0.35); }
+.qp-replay-btn:active { transform: scale(0.96); }
 .qp-answer-btn:active { transform: scale(0.95); background: rgba(168, 85, 247, 0.3); }
 .qp-answer-btn.correct { border-color: #2ecc71; background: rgba(46, 204, 113, 0.3); color: #2ecc71; }
 .qp-answer-btn.wrong { border-color: #e74c3c; background: rgba(231, 76, 60, 0.2); color: #e74c3c; opacity: 0.6; }
@@ -989,14 +1014,74 @@ html, body {
     min-height: 2em;
 }
 
-/* === Fire tablet touch target minimums (48px for ages 3-6) === */
+/* === Fire tablet touch target minimums ===
+   Primary CTAs (Play, song cards, difficulty): 80px min-height.
+   Secondary buttons / utility chrome: 48px floor. */
 .title-play-btn,
-.title-secondary-btn,
-.diff-btn,
 .song-card,
+.diff-btn,
+.qp-answer-btn {
+    min-height: 80px;
+    min-width: 80px;
+}
+.title-secondary-btn,
 .hud-pause,
-.results-buttons .btn,
+.results-buttons button,
+.btn-back,
+.otb-btn-small,
 [role="button"] {
     min-height: 48px;
     min-width: 48px;
+}
+
+/* === Streak celebration overlays (do NOT block input) === */
+.streak-pulse {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    pointer-events: none;
+    background: radial-gradient(circle at center, rgba(255, 215, 0, 0.25) 0%, transparent 70%);
+    animation: streak-pulse-anim 0.5s ease-out forwards;
+}
+@keyframes streak-pulse-anim {
+    0% { opacity: 0; transform: scale(0.9); }
+    40% { opacity: 1; transform: scale(1.02); }
+    100% { opacity: 0; transform: scale(1.05); }
+}
+.streak-pop {
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 81;
+    pointer-events: none;
+    font-family: var(--otb-font-heading);
+    font-size: 2.4rem;
+    color: #ffd700;
+    text-shadow: 0 0 18px rgba(255, 215, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.5);
+    letter-spacing: 2px;
+    animation: streak-pop-anim 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes streak-pop-anim {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+    25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+    60% { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+}
+
+/* === Difficulty color indicators on song cards ===
+   Game has difficulty 1/2/3 = easy/normal/hard. Indicator dot lives in .song-difficulty. */
+.song-card[data-song] .diff-dot:nth-child(1).filled { background: #4ade80; box-shadow: 0 0 6px rgba(74, 222, 128, 0.6); }
+.song-card[data-song] .diff-dot:nth-child(2).filled { background: #facc15; box-shadow: 0 0 6px rgba(250, 204, 21, 0.6); }
+.song-card[data-song] .diff-dot:nth-child(3).filled { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
+/* Mini badge on top-right of song banner showing difficulty emoji */
+.song-banner .diff-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 1.1rem;
+    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 10px;
+    z-index: 2;
 }

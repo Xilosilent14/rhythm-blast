@@ -16,8 +16,9 @@ const Audio = (() => {
     let settings = { sfx: true, music: true, voice: true };
 
     // Safe gain levels for children's hearing
+    // MUSIC_VOL reduced from 0.3 -> 0.2 to compensate for Fire-tablet speaker boost (Apr/May 2026)
     const MASTER_VOL = 0.7;
-    const MUSIC_VOL = 0.3;
+    const MUSIC_VOL = 0.2;
     const SFX_VOL = 0.5;
     const REVERB_WET = 0.15;
     const PAD_VOL = 0.08;
@@ -174,6 +175,29 @@ const Audio = (() => {
         osc.stop(c.currentTime + duration);
     }
 
+    // Sample-accurate envelope helper — schedules an oscillator at a precise audio-time offset.
+    // Use this instead of setTimeout for tight musical timing (avoids JS event-loop jitter on Silk).
+    function _makeNoteAt(freq, startOffset, duration, waveform = 'sine', gainNode = sfxGain, vol = 0.3) {
+        if (!settings.sfx && gainNode === sfxGain) return;
+        const c = _getCtx();
+        if (!c) return;
+        const start = c.currentTime + Math.max(0, startOffset);
+        try {
+            const osc = c.createOscillator();
+            const env = c.createGain();
+            osc.type = waveform;
+            osc.frequency.setValueAtTime(freq, start);
+            env.gain.setValueAtTime(0, start);
+            env.gain.linearRampToValueAtTime(vol, start + 0.01);
+            env.gain.linearRampToValueAtTime(vol * 0.6, start + 0.05);
+            env.gain.linearRampToValueAtTime(0, start + duration);
+            osc.connect(env);
+            env.connect(gainNode);
+            osc.start(start);
+            osc.stop(start + duration + 0.01);
+        } catch (e) { /* ignore */ }
+    }
+
     // C major pentatonic scale frequencies
     const SCALE = {
         C4: 261.63, D4: 293.66, E4: 329.63, G4: 392.00, A4: 440.00,
@@ -182,74 +206,118 @@ const Audio = (() => {
     const NOTES_ARR = Object.values(SCALE);
 
     // === SFX ===
+    // All multi-note sequences are scheduled via AudioContext.currentTime offsets
+    // (NOT setTimeout) so timing stays sample-accurate even on Silk under load.
     function perfectHit() {
         if (_playMP3('hit-perfect', 0.5)) return;
         // Bright, sparkly double chime
-        _makeNote(SCALE.E5, 0.12, 'sine', sfxGain, 0.35);
-        _makeNote(SCALE.E5 * 2, 0.08, 'sine', sfxGain, 0.15); // octave shimmer
-        setTimeout(() => {
-            _makeNote(SCALE.G5, 0.1, 'sine', sfxGain, 0.3);
-            _makeNote(SCALE.G5 * 2, 0.06, 'sine', sfxGain, 0.1);
-        }, 40);
+        _makeNoteAt(SCALE.E5, 0, 0.12, 'sine', sfxGain, 0.35);
+        _makeNoteAt(SCALE.E5 * 2, 0, 0.08, 'sine', sfxGain, 0.15); // octave shimmer
+        _makeNoteAt(SCALE.G5, 0.04, 0.1, 'sine', sfxGain, 0.3);
+        _makeNoteAt(SCALE.G5 * 2, 0.04, 0.06, 'sine', sfxGain, 0.1);
     }
 
     function greatHit() {
         if (_playMP3('hit-good', 0.4)) return;
         // Clean single chime
-        _makeNote(SCALE.C5, 0.1, 'sine', sfxGain, 0.3);
-        _makeNote(SCALE.E5, 0.06, 'sine', sfxGain, 0.15);
+        _makeNoteAt(SCALE.C5, 0, 0.1, 'sine', sfxGain, 0.3);
+        _makeNoteAt(SCALE.E5, 0, 0.06, 'sine', sfxGain, 0.15);
     }
 
     function okHit() {
         // Soft muted tone
-        _makeNote(SCALE.G4, 0.08, 'triangle', sfxGain, 0.2);
+        _makeNoteAt(SCALE.G4, 0, 0.08, 'triangle', sfxGain, 0.2);
     }
 
+    // Gentle neutral chime for misses — replaces harsh descending sound.
+    // Pair with a rotating TTS encouragement (handled by Game.js via missEncouragement()).
     function miss() {
-        if (_playMP3('hit-miss', 0.4)) return;
-        // Gentle low thud (not punishing for a 6yo)
-        _makeNote(160, 0.1, 'triangle', sfxGain, 0.12);
+        if (!settings.sfx) return;
+        // Soft two-tone neutral chime (no negativity)
+        _makeNoteAt(SCALE.G4, 0, 0.12, 'sine', sfxGain, 0.18);
+        _makeNoteAt(SCALE.C5, 0.06, 0.14, 'sine', sfxGain, 0.14);
+    }
+
+    // Rotating gentle encouragement phrases on miss. Uses CloudTTS so it works on Silk.
+    const ENCOURAGE_PHRASES = [
+        'Try again!',
+        'You got this!',
+        'Almost!',
+        'Keep going!',
+        'Nice try!',
+        'You can do it!'
+    ];
+    let _encourageIdx = 0;
+    function missEncouragement() {
+        if (!settings.voice) return;
+        const phrase = ENCOURAGE_PHRASES[_encourageIdx % ENCOURAGE_PHRASES.length];
+        _encourageIdx++;
+        try {
+            if (typeof CloudTTS !== 'undefined' && CloudTTS.speak) {
+                CloudTTS.speak(phrase, { volume: 0.7 });
+            } else {
+                speak(phrase);
+            }
+        } catch (e) {}
     }
 
     function comboBreak() {
         // Descending tone (informative, not harsh)
-        _makeNote(300, 0.12, 'triangle', sfxGain, 0.15);
-        setTimeout(() => _makeNote(200, 0.15, 'triangle', sfxGain, 0.12), 60);
+        _makeNoteAt(300, 0, 0.12, 'triangle', sfxGain, 0.15);
+        _makeNoteAt(200, 0.06, 0.15, 'triangle', sfxGain, 0.12);
     }
 
     function comboMilestone() {
         if (_playMP3('combo', 0.5)) return;
         // Ascending power-up fanfare
-        _makeNote(SCALE.C5, 0.06, 'square', sfxGain, 0.2);
-        setTimeout(() => _makeNote(SCALE.E5, 0.06, 'square', sfxGain, 0.22), 50);
-        setTimeout(() => _makeNote(SCALE.G5, 0.08, 'square', sfxGain, 0.25), 100);
-        setTimeout(() => _makeNote(SCALE.C5 * 2, 0.12, 'sine', sfxGain, 0.3), 160);
+        _makeNoteAt(SCALE.C5, 0, 0.06, 'square', sfxGain, 0.2);
+        _makeNoteAt(SCALE.E5, 0.05, 0.06, 'square', sfxGain, 0.22);
+        _makeNoteAt(SCALE.G5, 0.10, 0.08, 'square', sfxGain, 0.25);
+        _makeNoteAt(SCALE.C5 * 2, 0.16, 0.12, 'sine', sfxGain, 0.3);
+    }
+
+    // Short ascending streak chime for 3-perfect streak (does NOT block notes).
+    function streakChime3() {
+        if (!settings.sfx) return;
+        _makeNoteAt(SCALE.C5, 0, 0.06, 'sine', sfxGain, 0.22);
+        _makeNoteAt(SCALE.E5, 0.05, 0.06, 'sine', sfxGain, 0.24);
+        _makeNoteAt(SCALE.G5, 0.10, 0.08, 'sine', sfxGain, 0.26);
+    }
+
+    // 10+ streak fanfare — bigger, with harmony, still non-blocking.
+    function streakFanfare() {
+        if (!settings.sfx) return;
+        const notes = [SCALE.C5, SCALE.E5, SCALE.G5, SCALE.C5 * 2];
+        notes.forEach((f, i) => {
+            _makeNoteAt(f, i * 0.06, 0.14, 'square', sfxGain, 0.22);
+            _makeNoteAt(f * 1.5, i * 0.06, 0.10, 'sine', sfxGain, 0.10);
+        });
+        // Final shimmer
+        _makeNoteAt(SCALE.E5 * 2, 0.28, 0.18, 'sine', sfxGain, 0.18);
+        _makeNoteAt(SCALE.G5 * 2, 0.28, 0.18, 'sine', sfxGain, 0.14);
     }
 
     function countdown() {
-        _makeNote(SCALE.C4, 0.15, 'square', sfxGain, 0.25);
+        _makeNoteAt(SCALE.C4, 0, 0.15, 'square', sfxGain, 0.25);
     }
 
     function countdownGo() {
-        _makeNote(SCALE.C5, 0.1, 'square', sfxGain, 0.3);
-        setTimeout(() => _makeNote(SCALE.E5, 0.15, 'square', sfxGain, 0.35), 80);
+        _makeNoteAt(SCALE.C5, 0, 0.1, 'square', sfxGain, 0.3);
+        _makeNoteAt(SCALE.E5, 0.08, 0.15, 'square', sfxGain, 0.35);
     }
 
     function songComplete() {
-        // Triumphant ascending fanfare with harmony
+        // Triumphant ascending fanfare with harmony (sample-accurate)
         const fanfare = [SCALE.C5, SCALE.E5, SCALE.G5, SCALE.C5 * 2];
         fanfare.forEach((f, i) => {
-            setTimeout(() => {
-                _makeNote(f, 0.25, 'square', sfxGain, 0.25);
-                _makeNote(f * 1.5, 0.15, 'sine', sfxGain, 0.12); // harmony fifth
-            }, i * 140);
+            const t = i * 0.14;
+            _makeNoteAt(f, t, 0.25, 'square', sfxGain, 0.25);
+            _makeNoteAt(f * 1.5, t, 0.15, 'sine', sfxGain, 0.12); // harmony fifth
         });
         // Final chord
-        setTimeout(() => {
-            _makeNote(SCALE.C5, 0.5, 'sine', sfxGain, 0.2);
-            _makeNote(SCALE.E5, 0.5, 'sine', sfxGain, 0.15);
-            _makeNote(SCALE.G5, 0.5, 'sine', sfxGain, 0.15);
-        }, 600);
+        _makeNoteAt(SCALE.C5, 0.6, 0.5, 'sine', sfxGain, 0.2);
+        _makeNoteAt(SCALE.E5, 0.6, 0.5, 'sine', sfxGain, 0.15);
+        _makeNoteAt(SCALE.G5, 0.6, 0.5, 'sine', sfxGain, 0.15);
     }
 
     // === BEAT MUSIC ENGINE ===
@@ -526,7 +594,8 @@ const Audio = (() => {
 
     return {
         unlock, _getCtx,
-        perfectHit, greatHit, okHit, miss, comboBreak, comboMilestone,
+        perfectHit, greatHit, okHit, miss, missEncouragement,
+        comboBreak, comboMilestone, streakChime3, streakFanfare,
         countdown, countdownGo, songComplete, speak,
         startSong, stopSong, getBeatIndex, getBPM,
         setSettings, SCALE, NOTES_ARR
